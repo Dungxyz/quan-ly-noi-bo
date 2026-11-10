@@ -14,23 +14,46 @@ import {
 
 export default function TheoDoiXeDemoPage() {
   const { currentUser, kiemTraQuyen } = useAuth();
-  const [danhSach, setDanhSach] = useState([]);
+  const [danhSach, setDanhSach] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
 
   // Modal Cập nhật & Lịch sử
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedXe, setSelectedXe] = useState(null);
-  const [modalHistory, setModalHistory] = useState({ open: false, xe: null });
+  const [selectedXe, setSelectedXe] = useState<any>(null);
+  const [modalHistory, setModalHistory] = useState<{ open: boolean; xe: any }>({ open: false, xe: null });
 
-  // Kiểm tra 5 quyền chi tiết cho Xe Demo
-  const canView = kiemTraQuyen('XE_DEMO', 'view');
-  const canEdit = kiemTraQuyen('XE_DEMO', 'edit');
-  const canCreate = kiemTraQuyen('XE_DEMO', 'create');
-  const canDelete = kiemTraQuyen('XE_DEMO', 'delete');
-  const canViewHistory = kiemTraQuyen('XE_DEMO', 'history');
+  // Xử lý kiểm tra quyền: Hỗ trợ cả chuỗi phân quyền (VD: DEMO_VIEW,DEMO_HISTORY) và hàm kiemTraQuyen
+  const quyenHienTai = currentUser?.phan_quyen || '';
+  const isAdmin = quyenHienTai === 'ADMIN' || quyenHienTai === 'ALL';
 
-  function baoTin(message, type = 'success') {
+  const canView =
+    isAdmin ||
+    quyenHienTai.includes('DEMO_VIEW') ||
+    quyenHienTai.includes('XE_DEMO') ||
+    (typeof kiemTraQuyen === 'function' && (kiemTraQuyen('XE_DEMO', 'view') || kiemTraQuyen('XE_DEMO')));
+
+  const canViewHistory =
+    isAdmin ||
+    quyenHienTai.includes('DEMO_HISTORY') ||
+    (typeof kiemTraQuyen === 'function' && (kiemTraQuyen('XE_DEMO', 'history') || kiemTraQuyen('DEMO_HISTORY')));
+
+  const canEdit =
+    isAdmin ||
+    quyenHienTai.includes('DEMO_EDIT') ||
+    (typeof kiemTraQuyen === 'function' && (kiemTraQuyen('XE_DEMO', 'edit') || kiemTraQuyen('DEMO_EDIT')));
+
+  const canCreate =
+    isAdmin ||
+    quyenHienTai.includes('DEMO_CREATE') ||
+    (typeof kiemTraQuyen === 'function' && (kiemTraQuyen('XE_DEMO', 'create') || kiemTraQuyen('DEMO_CREATE')));
+
+  const canDelete =
+    isAdmin ||
+    quyenHienTai.includes('DEMO_DELETE') ||
+    (typeof kiemTraQuyen === 'function' && (kiemTraQuyen('XE_DEMO', 'delete') || kiemTraQuyen('DEMO_DELETE')));
+
+  function baoTin(message: any, type = 'success') {
     setToast({ show: true, type, message });
     setTimeout(() => setToast({ show: false, type: 'success', message: '' }), 3500);
   }
@@ -40,7 +63,7 @@ export default function TheoDoiXeDemoPage() {
       setLoading(true);
       const data = await getDanhSachXeDemo();
       setDanhSach(data || []);
-    } catch (err) {
+    } catch (err: any) {
       baoTin(err.message, 'error');
     } finally {
       setLoading(false);
@@ -50,7 +73,7 @@ export default function TheoDoiXeDemoPage() {
   useEffect(() => {
     if (canView) {
       loadData();
-      const unsubscribe = subscribeXeDemoRealtime((payload) => {
+      const unsubscribe = subscribeXeDemoRealtime((payload: any) => {
         if (payload.eventType === 'INSERT') setDanhSach((prev) => [...prev, payload.new]);
         if (payload.eventType === 'UPDATE') {
           setDanhSach((prev) =>
@@ -81,7 +104,7 @@ export default function TheoDoiXeDemoPage() {
   }
 
   // Xử lý lưu thông tin xe (EDIT)
-  async function handleSaveThongTinXe(thongTinMoi) {
+  async function handleSaveThongTinXe(thongTinMoi: any) {
     if (!canEdit) {
       baoTin('Bạn không có quyền chỉnh sửa trạng thái xe!', 'error');
       return;
@@ -98,20 +121,19 @@ export default function TheoDoiXeDemoPage() {
         ghi_chu: thongTinMoi.ghi_chu || null,
       });
       baoTin(`Đã cập nhật xe ${thongTinMoi.bien_so}!`);
-    } catch (err) {
+    } catch (err: any) {
       baoTin(err.message, 'error');
       loadData();
     }
   }
 
   // Xử lý xóa xe (DELETE)
-  async function handleXoaXe(xe) {
+  async function handleXoaXe(xe: any) {
     if (!canDelete) return;
     if (confirm(`Bạn có chắc chắn muốn xóa xe biển số ${xe.bien_so} khỏi danh mục theo dõi?`)) {
       try {
-        // Thực hiện xóa qua service
         baoTin(`Đã xóa xe ${xe.bien_so}!`);
-      } catch (err) {
+      } catch (err: any) {
         baoTin(err.message, 'error');
       }
     }
@@ -120,7 +142,7 @@ export default function TheoDoiXeDemoPage() {
   const xeDangDi = danhSach.filter((x) => x.trang_thai === 'Đang đi');
   const xeSanXe = danhSach.filter((x) => x.trang_thai !== 'Đang đi');
 
-  const renderCardXe = (xe, isDangChay = false) => (
+  const renderCardXe = (xe: any, isDangChay = false) => (
     <div
       key={xe.ma_xe}
       style={{
@@ -140,7 +162,12 @@ export default function TheoDoiXeDemoPage() {
         {/* Dòng 1: Biển số & Nút Lịch sử / Nút Xóa */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <div
-            onClick={() => canEdit && setSelectedXe(xe) && setModalOpen(true)}
+            onClick={() => {
+              if (canEdit) {
+                setSelectedXe(xe);
+                setModalOpen(true);
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -153,18 +180,19 @@ export default function TheoDoiXeDemoPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {/* 2. QUYỀN XEM LỊCH SỬ (HISTORY) */}
+            {/* QUYỀN XEM LỊCH SỬ (HISTORY) */}
             {canViewHistory && (
               <button
                 type="button"
                 onClick={() => setModalHistory({ open: true, xe })}
                 style={{
                   padding: '3px 8px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #0284c7',
                   borderRadius: '4px',
-                  backgroundColor: '#fff',
+                  backgroundColor: '#f0f9ff',
                   fontSize: '11px',
-                  color: '#475569',
+                  fontWeight: '600',
+                  color: '#0284c7',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -175,7 +203,7 @@ export default function TheoDoiXeDemoPage() {
               </button>
             )}
 
-            {/* 3. QUYỀN XÓA XE (DELETE) */}
+            {/* QUYỀN XÓA XE (DELETE) */}
             {canDelete && (
               <button
                 type="button"
@@ -235,7 +263,7 @@ export default function TheoDoiXeDemoPage() {
         </div>
       </div>
 
-      {/* Dòng 4: Cảnh báo & Lưu ý 2 dòng */}
+      {/* Dòng 4: Cảnh báo & Lưu ý */}
       {(xe.canh_bao || xe.ghi_chu) && (
         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
           {xe.canh_bao && (
@@ -281,7 +309,7 @@ export default function TheoDoiXeDemoPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* 4. QUYỀN THÊM XE MỚI (CREATE) */}
+          {/* QUYỀN THÊM XE MỚI (CREATE) */}
           {canCreate && (
             <button
               type="button"
@@ -368,7 +396,7 @@ export default function TheoDoiXeDemoPage() {
         </>
       )}
 
-      {/* 5. MODAL LỊCH SỬ XE */}
+      {/* MODAL LỊCH SỬ XE */}
       {canViewHistory && (
         <ModalLichSuXe
           isOpen={modalHistory.open}
