@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
       if (savedMaNV) {
         const { data, error } = await supabase
           .from('nhan_vien')
-          .select('ma_nv, ho_ten, bo_phan, vi_tri, phan_quyen, so_dien_thoai, trang_thai')
+          .select('*')
           .eq('ma_nv', savedMaNV)
           .single();
 
