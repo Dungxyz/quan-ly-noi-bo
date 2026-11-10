@@ -78,3 +78,15 @@ export function subscribeNhanVienRealtime(callback) {
     supabase.removeChannel(channel);
   };
 }
+
+import { supabase } from '@/lib/supabaseClient'; // Hoặc đường dẫn client supabase của bạn
+
+export async function doiMatKhauNhanSu(ma_nv: string, matKhauMoi: string) {
+  const { data, error } = await supabase
+    .from('nhan_su')
+    .update({ mat_khau: matKhauMoi })
+    .eq('ma_nv', ma_nv);
+
+  if (error) throw error;
+  return data;
+}

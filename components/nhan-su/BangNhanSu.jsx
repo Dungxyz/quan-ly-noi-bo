@@ -140,6 +140,25 @@ export default function BangNhanSu({
                           >
                             ✏️
                           </button>
+                          
+                          {/* 👉 THÊM NÚT ĐỔI MẬT KHẨU TẠI ĐÂY */}
+                          {onDoiMatKhau && (
+                            <button
+                              type="button"
+                              onClick={() => onDoiMatKhau(nv)}
+                              title="Đổi/Cấp lại mật khẩu"
+                              style={{
+                                padding: '4px 6px',
+                                border: '1px solid #fed7aa',
+                                backgroundColor: '#fff7ed',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              🔑
+                            </button>
+                          )}
 
                           <button
                             type="button"

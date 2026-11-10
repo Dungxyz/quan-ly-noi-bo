@@ -16,16 +16,22 @@ import FormNhanSu from '@/components/nhan-su/FormNhanSu';
 import BangNhanSu from '@/components/nhan-su/BangNhanSu';
 
 export default function NhanSuPage() {
-  const [danhSach, setDanhSach] = useState([]);
+  const { currentUser, kiemTraQuyen } = useAuth();
+  const isAdmin = currentUser?.phan_quyen === 'ADMIN' || currentUser?.phan_quyen === 'ALL';
+
+  const [danhSach, setDanhSach] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tuKhoa, setTuKhoa] = useState('');
   const [formData, setFormData] = useState(FORM_MAC_DINH);
   const [dangChinhSua, setDangChinhSua] = useState(false);
   const [dangLuu, setDangLuu] = useState(false);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
-  const { currentUser, kiemTraQuyen } = useAuth();
 
-  function baoTin(message, type = 'success') {
+  // State quản lý popup đổi mật khẩu
+  const [modalPass, setModalPass] = useState<{ open: boolean; nv: any }>({ open: false, nv: null });
+  const [newPassword, setNewPassword] = useState('123456');
+
+  function baoTin(message: any, type = 'success') {
     setToast({ show: true, type, message });
     setTimeout(() => setToast({ show: false, type: 'success', message: '' }), 3500);
   }
@@ -34,8 +40,8 @@ export default function NhanSuPage() {
     try {
       setLoading(true);
       const data = await getDanhSachNhanVien();
-      setDanhSach(data);
-    } catch (err) {
+      setDanhSach(data || []);
+    } catch (err: any) {
       baoTin(err.message, 'error');
     } finally {
       setLoading(false);
@@ -44,7 +50,7 @@ export default function NhanSuPage() {
 
   useEffect(() => {
     loadData();
-    const unsubscribe = subscribeNhanVienRealtime((payload) => {
+    const unsubscribe = subscribeNhanVienRealtime((payload: any) => {
       if (payload.eventType === 'INSERT') setDanhSach((prev) => [...prev, payload.new]);
       if (payload.eventType === 'UPDATE') setDanhSach((prev) => prev.map((x) => (x.ma_nv === payload.new.ma_nv ? payload.new : x)));
       if (payload.eventType === 'DELETE') setDanhSach((prev) => prev.filter((x) => x.ma_nv !== payload.old.ma_nv));
@@ -52,7 +58,7 @@ export default function NhanSuPage() {
     return () => unsubscribe();
   }, []);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: any) {
     e.preventDefault();
     if (!formData.ma_nv.trim() || !formData.ho_ten.trim()) {
       return baoTin('Vui lòng nhập Mã NV và Họ tên!', 'warning');
@@ -68,45 +74,58 @@ export default function NhanSuPage() {
       }
       setFormData(FORM_MAC_DINH);
       setDangChinhSua(false);
-    } catch (err) {
+    } catch (err: any) {
       baoTin(err.message, 'error');
     } finally {
       setDangLuu(false);
     }
   }
 
-  async function handleToggleKhoa(ma_nv, phanQuyen) {
+  async function handleToggleKhoa(ma_nv: any, phanQuyen: any) {
     const nextStatus = phanQuyen === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
     setDanhSach((prev) => prev.map((x) => (x.ma_nv === ma_nv ? { ...x, phan_quyen: nextStatus } : x)));
     try {
       await toggleTrangThaiNhanVien(ma_nv, phanQuyen);
       baoTin(`Đã ${nextStatus === 'LOCKED' ? 'khóa' : 'mở khóa'} tài khoản ${ma_nv}!`);
-    } catch (err) {
+    } catch (err: any) {
       baoTin(err.message, 'error');
       loadData();
     }
   }
 
-  async function handleDelete(ma_nv, ho_ten) {
+  async function handleDelete(ma_nv: any, ho_ten: any) {
     if (!confirm(`Xóa nhân sự ${ho_ten} (${ma_nv})?`)) return;
     setDanhSach((prev) => prev.filter((x) => x.ma_nv !== ma_nv));
     try {
       await deleteNhanVien(ma_nv);
       baoTin(`Đã xóa nhân sự ${ho_ten}!`);
-    } catch (err) {
+    } catch (err: any) {
       baoTin(err.message, 'error');
       loadData();
     }
   }
 
-  function handleEdit(nv) {
-    // Biến toàn bộ giá trị null thành chuỗi rỗng '' để tránh lỗi input null
+  function handleEdit(nv: any) {
     const duLieuChuan = Object.fromEntries(
       Object.entries(nv).map(([key, val]) => [key, val === null ? '' : val])
     );
     setFormData(duLieuChuan);
     setDangChinhSua(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Xử lý đổi mật khẩu qua updateNhanVien
+  async function handleSaveNewPassword() {
+    if (!newPassword.trim()) {
+      return baoTin('Mật khẩu không được để trống!', 'warning');
+    }
+    try {
+      await updateNhanVien(modalPass.nv.ma_nv, { mat_khau: newPassword.trim() });
+      baoTin(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${newPassword.trim()}`);
+      setModalPass({ open: false, nv: null });
+    } catch (err: any) {
+      baoTin(err.message || 'Lỗi khi cập nhật mật khẩu', 'error');
+    }
   }
 
   const ketQuaLoc = useMemo(() => {
@@ -119,7 +138,6 @@ export default function NhanSuPage() {
     );
   }, [danhSach, tuKhoa]);
 
-    // Kiểm tra quyền truy cập module Nhân sự
   if (!kiemTraQuyen('NHAN_SU')) {
     return (
       <div style={{ padding: '80px 20px', textAlign: 'center', fontFamily: 'Segoe UI, sans-serif' }}>
@@ -130,7 +148,6 @@ export default function NhanSuPage() {
         <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 20px 0' }}>
           Tài khoản <strong>{currentUser?.ho_ten}</strong> ({currentUser?.phan_quyen}) không có quyền quản lý hồ sơ nhân sự.
         </p>
-        {/* 👉 Đổi href từ /xe-demo thành /ho-so */}
         <a
           href="/ho-so"
           style={{
@@ -161,7 +178,7 @@ export default function NhanSuPage() {
             KHAI BÁO & QUẢN LÝ HỒ SƠ NHÂN SỰ
           </h1>
         </div>
-        {/* Thanh Tab chuyển nhanh như hệ thống cũ */}
+
         <div style={{ display: 'flex', gap: '8px', padding: '12px 24px 0 24px', borderBottom: '1px solid #e2e8f0' }}>
           <a
             href="/"
@@ -196,6 +213,7 @@ export default function NhanSuPage() {
             👥 Phân Quyền Tài Khoản
           </a>
         </div>
+
         <FormNhanSu
           formData={formData}
           setFormData={setFormData}
@@ -214,9 +232,100 @@ export default function NhanSuPage() {
           onEdit={handleEdit}
           onToggleKhoa={handleToggleKhoa}
           onDelete={handleDelete}
-          onNotifyZalo={(nv) => baoTin(`Gửi Zalo đến ${nv.ho_ten} (${nv.uid_zalo || 'Chưa có UID'})`)}
+          onNotifyZalo={(nv: any) => baoTin(`Gửi Zalo đến ${nv.ho_ten} (${nv.uid_zalo || 'Chưa có UID'})`)}
+          onDoiMatKhau={isAdmin ? (nv: any) => { setModalPass({ open: true, nv }); setNewPassword('123456'); } : null}
         />
       </div>
+
+      {/* POPUP MODAL ĐỔI MẬT KHẨU CHO ADMIN */}
+      {modalPass.open && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }}>
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '10px',
+            width: '100%',
+            maxWidth: '380px',
+            padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#0f172a', fontWeight: 'bold' }}>
+              🔑 Cấp / Đổi Mật Khẩu
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
+              Đổi mật khẩu cho: <strong style={{ color: '#0284c7' }}>{modalPass.nv?.ho_ten}</strong> ({modalPass.nv?.ma_nv})
+            </p>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                Mật khẩu mới:
+              </label>
+              <input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Nhập mật khẩu mới..."
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
+                Mặc định tiêu chuẩn đại lý là: <code>123456</code>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setModalPass({ open: false, nv: null })}
+                style={{
+                  padding: '8px 14px',
+                  backgroundColor: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNewPassword}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#0284c7',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Lưu mật khẩu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
