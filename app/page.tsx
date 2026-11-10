@@ -142,19 +142,26 @@ export default function NhanSuPage() {
     }
 
     try {
-      // Thử cập nhật cột mat_khau trước
-      try {
-        await updateNhanVien(modalPass.nv.ma_nv, { mat_khau: mk });
-      } catch (e1) {
-        // Nếu database dùng cột so_dien_thoai làm mật khẩu đăng nhập
-        await updateNhanVien(modalPass.nv.ma_nv, { so_dien_thoai: mk });
+      // 1. Cập nhật thẳng vào bảng nhan_vien (cột mat_khau)
+      let { error } = await supabase
+        .from('nhan_vien')
+        .update({ mat_khau: mk })
+        .eq('ma_nv', modalPass.nv.ma_nv);
+
+      // 2. Nếu bảng không có cột mat_khau (báo lỗi column), thử tiếp cột so_dien_thoai
+      if (error) {
+        const res2 = await supabase
+          .from('nhan_vien')
+          .update({ so_dien_thoai: mk })
+          .eq('ma_nv', modalPass.nv.ma_nv);
+        if (res2.error) throw res2.error;
       }
 
       setModalPass({ open: false, nv: null });
-      alert(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${mk}`);
+      alert(`Đã đổi mật khẩu thành công cho ${modalPass.nv.ho_ten}: ${mk}`);
       loadData();
     } catch (err: any) {
-      alert('Lỗi cập nhật: ' + (err?.message || 'Không thể lưu mật khẩu'));
+      alert('Lỗi khi lưu mật khẩu: ' + (err?.message || JSON.stringify(err)));
     }
   }
 
