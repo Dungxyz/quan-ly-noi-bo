@@ -80,11 +80,16 @@ export function subscribeNhanVienRealtime(callback) {
 }
 
 export async function doiMatKhauNhanSu(ma_nv, matKhauMoi) {
-  const { data, error } = await supabase
-    .from('nhan_su')
-    .update({ mat_khau: matKhauMoi })
-    .eq('ma_nv', ma_nv);
+  try {
+    const { data, error } = await supabase
+      .from('nhan_su')
+      .update({ mat_khau: matKhauMoi })
+      .eq('ma_nv', ma_nv);
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('Loi doi mat khau:', err);
+    throw err;
+  }
 }
