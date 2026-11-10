@@ -135,36 +135,26 @@ export default function NhanSuPage() {
   }
 
   async function handleLuuMatKhau() {
-    const mk = newPassword.trim();
+    const mk = (newPassword || '').trim();
     if (!mk) {
-      return baoTin('Mật khẩu không được để trống!', 'warning');
+      alert('Vui lòng nhập mật khẩu mới!');
+      return;
     }
 
     try {
-      // Cập nhật trực tiếp vào bảng nhan_vien trên Supabase
-      // Cập nhật cả mat_khau lẫn so_dien_thoai (nếu hệ thống dùng SĐT làm pass)
-      const { error } = await supabase
-        .from('nhan_vien')
-        .update({ 
-          mat_khau: mk,
-          so_dien_thoai: mk 
-        })
-        .eq('ma_nv', modalPass.nv.ma_nv);
-
-      if (error) {
-        // Nếu database của bạn chỉ có 1 trong 2 cột, fallback thử cập nhật riêng từng cột
-        const { error: err2 } = await supabase
-          .from('nhan_vien')
-          .update({ so_dien_thoai: mk })
-          .eq('ma_nv', modalPass.nv.ma_nv);
-        if (err2) throw err2;
+      // Thử cập nhật cột mat_khau trước
+      try {
+        await updateNhanVien(modalPass.nv.ma_nv, { mat_khau: mk });
+      } catch (e1) {
+        // Nếu database dùng cột so_dien_thoai làm mật khẩu đăng nhập
+        await updateNhanVien(modalPass.nv.ma_nv, { so_dien_thoai: mk });
       }
 
       setModalPass({ open: false, nv: null });
-      baoTin(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${mk}!`);
+      alert(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${mk}`);
       loadData();
     } catch (err: any) {
-      alert('Lỗi Supabase: ' + (err.message || JSON.stringify(err)));
+      alert('Lỗi cập nhật: ' + (err?.message || 'Không thể lưu mật khẩu'));
     }
   }
 
