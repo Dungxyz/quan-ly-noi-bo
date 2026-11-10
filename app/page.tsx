@@ -139,13 +139,17 @@ export default function NhanSuPage() {
       return baoTin('Mật khẩu không được để trống!', 'warning');
     }
     try {
-      if (typeof doiMatKhauNhanSu === 'function') {
-        await doiMatKhauNhanSu(modalPass.nv.ma_nv, newPassword.trim());
-      } else {
-        await updateNhanVien(modalPass.nv.ma_nv, { mat_khau: newPassword.trim() });
-      }
-      baoTin(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${newPassword.trim()}`);
+      // Gọi trực tiếp hàm doiMatKhauNhanSu đã trỏ chuẩn vào bảng nhan_vien
+      await doiMatKhauNhanSu(modalPass.nv.ma_nv, newPassword.trim());
+      
+      // Đóng modal trước
       setModalPass({ open: false, nv: null });
+      
+      // Báo tin thành công
+      baoTin(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${newPassword.trim()}`);
+      
+      // Nạp lại danh sách để đồng bộ
+      loadData();
     } catch (err: any) {
       baoTin(err?.message || 'Lỗi đổi mật khẩu', 'error');
     }
