@@ -129,7 +129,7 @@ export default function NhanSuPage() {
     const duLieuChuan = Object.fromEntries(
       Object.entries(nv).map(([key, val]) => [key, val === null ? '' : val])
     );
-    setFormData(duLieuChuan);
+    setFormData(duLieuChuan as any);
     setDangChinhSua(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
