@@ -82,7 +82,7 @@ export function subscribeNhanVienRealtime(callback) {
 export async function doiMatKhauNhanSu(ma_nv, matKhauMoi) {
   try {
     const { data, error } = await supabase
-      .from('nhan_su')
+      .from('nhan_vien')
       .update({ mat_khau: matKhauMoi })
       .eq('ma_nv', ma_nv);
 
