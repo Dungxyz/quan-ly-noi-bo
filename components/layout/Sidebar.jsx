@@ -12,6 +12,14 @@ export default function Sidebar() {
 
   const menuItems = [
     {
+      title: 'Hồ Sơ Của Tôi',
+      icon: '🪪',
+      path: '/ho-so',
+      moduleKey: 'HO_SO',
+      moTa: 'Tài khoản hệ thống & thông tin',
+      isPublic: true, // Mục chung dành cho mọi nhân sự có tài khoản
+    },
+    {
       title: 'Quản lý Nhân sự',
       icon: '👤',
       path: '/',
@@ -156,7 +164,7 @@ export default function Sidebar() {
           </div>
 
           {menuItems.map((item) => {
-            const duocPhep = kiemTraQuyen(item.moduleKey);
+            const duocPhep = item.isPublic || (typeof kiemTraQuyen === 'function' ? kiemTraQuyen(item.moduleKey) : false);
             const dangChon = pathname === item.path;
 
             if (!duocPhep) {
