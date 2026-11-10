@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
@@ -9,9 +9,35 @@ export default function LoginPage() {
   const [matKhau, setMatKhau] = useState('');
   const [dangXuLy, setDangXuLy] = useState(false);
   const [thongBaoLoi, setThongBaoLoi] = useState('');
-  const [thanhCong, setThanhCong] = useState(null); // Lưu thông tin nhân viên để chào mừng
+  const [thanhCong, setThanhCong] = useState<any>(null);
 
-  async function handleFormSubmit(e) {
+  // Hàm xác định trang đích và chuyển hướng
+  function dieuHuongTheoQuyen(user: any) {
+    const quyen = (user?.phan_quyen || '').toUpperCase();
+
+    // 1. Quản trị hệ thống hoặc phân hệ Nhân sự
+    if (quyen === 'ADMIN' || quyen === 'ALL' || quyen.includes('NHAN_SU')) {
+      window.location.href = '/';
+      return;
+    }
+
+    // 2. Phân hệ Xe Demo
+    if (quyen.includes('DEMO')) {
+      window.location.href = '/xe-demo';
+      return;
+    }
+
+    // 3. Phân hệ Đặt hoa
+    if (quyen.includes('HOA') || quyen.includes('DAT_HOA')) {
+      window.location.href = '/dat-hoa';
+      return;
+    }
+
+    // 4. Mặc định (Tài khoản ACTIVE, mới mở khóa hoặc chưa cấp quyền cụ thể)
+    window.location.href = '/ho-so';
+  }
+
+  async function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     setThongBaoLoi('');
     setDangXuLy(true);
@@ -19,7 +45,12 @@ export default function LoginPage() {
     try {
       const user = await dangNhap(taiKhoan, matKhau);
       setThanhCong(user);
-    } catch (err) {
+
+      // Chờ 1.2 giây để người dùng thấy thông báo chào mừng trước khi chuyển trang
+      setTimeout(() => {
+        dieuHuongTheoQuyen(user);
+      }, 1200);
+    } catch (err: any) {
       setThongBaoLoi(err.message || 'Đăng nhập không thành công');
       setDangXuLy(false);
     }
@@ -89,14 +120,23 @@ export default function LoginPage() {
           <div style={{ padding: '40px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: '48px', marginBottom: '14px' }}>🎉</div>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#15803d', margin: '0 0 6px 0' }}>
-              Xin chào, {thanhCong.ho_ten}!
+              Xin chào, {thanhCong?.ho_ten || 'Bạn'}!
             </h2>
             <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0' }}>
               Chào mừng bạn đã quay trở lại hệ thống điều hành Bình Phước Ford.
             </p>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#0284c7', fontSize: '13px', fontWeight: '600' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: '#0284c7',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}
+            >
               <span>🔄</span>
-              <span>Đang mở bảng điều khiển...</span>
+              <span>Đang mở giao diện phù hợp...</span>
             </div>
           </div>
         ) : (
@@ -123,7 +163,15 @@ export default function LoginPage() {
             )}
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '6px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  color: '#475569',
+                  marginBottom: '6px',
+                }}
+              >
                 MÃ NHÂN VIÊN HOẶC SỐ ĐIỆN THOẠI
               </label>
               <input

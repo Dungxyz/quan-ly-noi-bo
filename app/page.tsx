@@ -130,8 +130,9 @@ export default function NhanSuPage() {
         <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 20px 0' }}>
           Tài khoản <strong>{currentUser?.ho_ten}</strong> ({currentUser?.phan_quyen}) không có quyền quản lý hồ sơ nhân sự.
         </p>
+        {/* 👉 Đổi href từ /xe-demo thành /ho-so */}
         <a
-          href="/xe-demo"
+          href="/ho-so"
           style={{
             display: 'inline-block',
             padding: '9px 18px',
@@ -143,7 +144,7 @@ export default function NhanSuPage() {
             fontWeight: 'bold',
           }}
         >
-          🚗 Chuyển đến trang Xe Demo & Lái thử
+          🪪 Chuyển đến trang Hồ Sơ Của Tôi
         </a>
       </div>
     );
