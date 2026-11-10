@@ -352,17 +352,17 @@ export default function NhanSuPage() {
                 Hủy bỏ
               </button>
               <button
-                type="button"
-                onClick={handleLuuMatKhau}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#0284c7',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
+                  type="button"
+                  onClick={handleLuuMatKhau}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#0284c7',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
                 }}
               >
                 Lưu mật khẩu
