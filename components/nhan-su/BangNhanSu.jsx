@@ -10,6 +10,7 @@ export default function BangNhanSu({
   onToggleKhoa,
   onDelete,
   onNotifyZalo,
+  onDoiMatKhau,
 }) {
   return (
     <div style={{ padding: '0 24px 24px 24px' }}>
@@ -142,7 +143,7 @@ export default function BangNhanSu({
                           </button>
                           
                           {/* 👉 THÊM NÚT ĐỔI MẬT KHẨU TẠI ĐÂY */}
-                          {onDoiMatKhau && (
+                          {typeof onDoiMatKhau === 'function' && (
                             <button
                               type="button"
                               onClick={() => onDoiMatKhau(nv)}
