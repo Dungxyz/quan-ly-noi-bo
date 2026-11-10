@@ -13,27 +13,6 @@ export default function LoginPage() {
 
   // Hàm xác định trang đích và chuyển hướng
   function dieuHuongTheoQuyen(user: any) {
-    const quyen = (user?.phan_quyen || '').toUpperCase();
-
-    // 1. Quản trị hệ thống hoặc phân hệ Nhân sự
-    if (quyen === 'ADMIN' || quyen === 'ALL' || quyen.includes('NHAN_SU')) {
-      window.location.href = '/';
-      return;
-    }
-
-    // 2. Phân hệ Xe Demo
-    if (quyen.includes('DEMO')) {
-      window.location.href = '/xe-demo';
-      return;
-    }
-
-    // 3. Phân hệ Đặt hoa
-    if (quyen.includes('HOA') || quyen.includes('DAT_HOA')) {
-      window.location.href = '/dat-hoa';
-      return;
-    }
-
-    // 4. Mặc định (Tài khoản ACTIVE, mới mở khóa hoặc chưa cấp quyền cụ thể)
     window.location.href = '/ho-so';
   }
 
