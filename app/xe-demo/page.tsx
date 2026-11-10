@@ -27,15 +27,28 @@ export default function TheoDoiXeDemoPage() {
 
   const [openModalThemXe, setOpenModalThemXe] = useState(false);
     async function handleSaveXeDemo(duLieuXe: any) {
+    try {
+      const payload = {
+        bien_so: duLieuXe.bien_so,
+        loai_xe: duLieuXe.ten_xe || duLieuXe.loai_xe,
+        so_km: Number(duLieuXe.so_km_hien_tai || duLieuXe.so_km || 0),
+        trang_thai: duLieuXe.trang_thai === 'DANG_CHAY' ? 'Đang đi' : 'Sẵn xe',
+        ghi_chu: duLieuXe.ghi_chu || null,
+      };
+
       const { data, error } = await supabase
-        .from('xe_demo') // hoặc tên bảng xe demo của bạn trong Supabase
-        .insert([duLieuXe]);
+        .from('xe_demo')
+        .insert([payload]);
 
       if (error) throw error;
 
-      alert(`Đã thêm thành công xe ${duLieuXe.bien_so}!`);
-      loadDanhSachXe(); // Gọi lại hàm tải danh sách xe của bạn để cập nhật ngay
+      baoTin(`Đã thêm thành công xe ${duLieuXe.bien_so}!`);
+      loadData(); // Gọi đúng tên hàm loadData
+    } catch (err: any) {
+      alert('Lỗi lưu xe: ' + (err?.message || JSON.stringify(err)));
     }
+  }
+  
   // Xử lý kiểm tra quyền: Hỗ trợ cả chuỗi phân quyền (VD: DEMO_VIEW,DEMO_HISTORY) và hàm kiemTraQuyen
   const quyenHienTai = currentUser?.phan_quyen || '';
   const isAdmin = quyenHienTai === 'ADMIN' || quyenHienTai === 'ALL';
