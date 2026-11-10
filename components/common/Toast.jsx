@@ -12,7 +12,7 @@ export default function Toast({ toast, onClose }) {
         position: 'fixed',
         top: '24px',
         right: '24px',
-        zIndex: 9999,
+        zIndex: 1000000,
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
