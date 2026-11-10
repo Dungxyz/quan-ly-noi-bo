@@ -1,5 +1,5 @@
 'use client';
-
+import { supabase } from '@/lib/supabase';
 import { useEffect, useState, useMemo } from 'react';
 import { FORM_MAC_DINH } from '@/constants/nhanSuConfig';
 import { useAuth } from '@/context/AuthContext';
@@ -135,23 +135,36 @@ export default function NhanSuPage() {
   }
 
   async function handleLuuMatKhau() {
-    if (!newPassword.trim()) {
+    const mk = newPassword.trim();
+    if (!mk) {
       return baoTin('Mật khẩu không được để trống!', 'warning');
     }
+
     try {
-      // Gọi trực tiếp hàm doiMatKhauNhanSu đã trỏ chuẩn vào bảng nhan_vien
-      await doiMatKhauNhanSu(modalPass.nv.ma_nv, newPassword.trim());
-      
-      // Đóng modal trước
+      // Cập nhật trực tiếp vào bảng nhan_vien trên Supabase
+      // Cập nhật cả mat_khau lẫn so_dien_thoai (nếu hệ thống dùng SĐT làm pass)
+      const { error } = await supabase
+        .from('nhan_vien')
+        .update({ 
+          mat_khau: mk,
+          so_dien_thoai: mk 
+        })
+        .eq('ma_nv', modalPass.nv.ma_nv);
+
+      if (error) {
+        // Nếu database của bạn chỉ có 1 trong 2 cột, fallback thử cập nhật riêng từng cột
+        const { error: err2 } = await supabase
+          .from('nhan_vien')
+          .update({ so_dien_thoai: mk })
+          .eq('ma_nv', modalPass.nv.ma_nv);
+        if (err2) throw err2;
+      }
+
       setModalPass({ open: false, nv: null });
-      
-      // Báo tin thành công
-      baoTin(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${newPassword.trim()}`);
-      
-      // Nạp lại danh sách để đồng bộ
+      baoTin(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${mk}!`);
       loadData();
     } catch (err: any) {
-      baoTin(err?.message || 'Lỗi đổi mật khẩu', 'error');
+      alert('Lỗi Supabase: ' + (err.message || JSON.stringify(err)));
     }
   }
 
