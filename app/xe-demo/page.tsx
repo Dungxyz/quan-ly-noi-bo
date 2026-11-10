@@ -1,10 +1,12 @@
 'use client';
 
+import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Toast from '@/components/common/Toast';
 import ModalCapNhatXe from '@/components/xe-demo/ModalCapNhatXe';
 import ModalLichSuXe from '@/components/xe-demo/ModalLichSuXe';
+import ModalThemXeDemo from '@/components/xe-demo/ModalThemXeDemo';
 import {
   getDanhSachXeDemo,
   updateXeDemo,
@@ -23,6 +25,17 @@ export default function TheoDoiXeDemoPage() {
   const [selectedXe, setSelectedXe] = useState<any>(null);
   const [modalHistory, setModalHistory] = useState<{ open: boolean; xe: any }>({ open: false, xe: null });
 
+  const [openModalThemXe, setOpenModalThemXe] = useState(false);
+    async function handleSaveXeDemo(duLieuXe: any) {
+      const { data, error } = await supabase
+        .from('xe_demo') // hoặc tên bảng xe demo của bạn trong Supabase
+        .insert([duLieuXe]);
+
+      if (error) throw error;
+
+      alert(`Đã thêm thành công xe ${duLieuXe.bien_so}!`);
+      loadDanhSachXe(); // Gọi lại hàm tải danh sách xe của bạn để cập nhật ngay
+    }
   // Xử lý kiểm tra quyền: Hỗ trợ cả chuỗi phân quyền (VD: DEMO_VIEW,DEMO_HISTORY) và hàm kiemTraQuyen
   const quyenHienTai = currentUser?.phan_quyen || '';
   const isAdmin = quyenHienTai === 'ADMIN' || quyenHienTai === 'ALL';
@@ -313,7 +326,7 @@ export default function TheoDoiXeDemoPage() {
           {canCreate && (
             <button
               type="button"
-              onClick={() => alert('Mở form thêm xe mới')}
+              onClick={() => setOpenModalThemXe(true)}
               style={{
                 padding: '7px 14px',
                 borderRadius: '6px',
@@ -414,6 +427,13 @@ export default function TheoDoiXeDemoPage() {
           onSave={handleSaveThongTinXe}
         />
       )}
+
+      {/* Modal thêm xe demo */}
+    <ModalThemXeDemo
+      isOpen={openModalThemXe}
+      onClose={() => setOpenModalThemXe(false)}
+      onSave={handleSaveXeDemo}
+    />
     </div>
   );
 }
