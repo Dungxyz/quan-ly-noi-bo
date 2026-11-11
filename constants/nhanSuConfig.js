@@ -43,8 +43,8 @@ export const CO_CAU_TO_CHUC = {
   'Hỗ trợ kinh doanh': ['Đăng ký viên','Kho xe','Sale Admin']  ,
   'Phụ tùng': ['Trưởng bộ phận', 'Nhân viên'],
   'Phụ kiện & Bảo hiểm': ['Trưởng bộ phận', 'Nhân viên'],
-  'Sửa chữa chung': ['Quản đốc', 'Trưởng nhóm', 'Kỹ thuật viên'],
-  'Đồng sơn': ['Quản đốc', 'Trưởng nhóm', 'Kỹ thuật viên'],
+  'Sửa chữa chung': ['Quản đốc', 'Tổ trưởng', 'Kỹ thuật viên'],
+  'Đồng sơn': ['Quản đốc', 'Tổ trưởng Đồng','Tổ trưởng Sơn','Kỹ thuật viên'],
   'Dich vụ': ['Lễ tân', 'Rửa xe'],
   'Điều phối': ['Trưởng bộ phận', 'Điều phối viên'],
   // Sửa hoặc bổ sung thêm tại đây
