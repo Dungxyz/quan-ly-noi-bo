@@ -115,12 +115,12 @@ export default function KhachHangHenPage() {
         co_van: formData.co_van || null,
       };
 
-      if (isEditing && formData.id) {
-        // CẬP NHẬT
+      if (isEditing) {
+        // CẬP NHẬT THEO BIỂN SỐ (KHÓA CHÍNH)
         const { error } = await supabase
           .from('dich_vu_khach_hang')
           .update(payload)
-          .eq('id', formData.id);
+          .eq('bien_so', bsChuan);
 
         if (error) throw error;
         alert(`Đã cập nhật thông tin xe ${bsChuan}!`);
@@ -143,7 +143,7 @@ export default function KhachHangHenPage() {
     }
   }
 
-  // 5. Xóa khách hàng
+  // 5. Xóa theo biển số (Khóa chính)
   async function handleDelete(item: KhachHangItem) {
     if (!confirm(`Bạn có chắc chắn muốn xóa khách hẹn xe biển số "${item.bien_so}"?`)) {
       return;
@@ -153,12 +153,11 @@ export default function KhachHangHenPage() {
       const { error } = await supabase
         .from('dich_vu_khach_hang')
         .delete()
-        .eq('id', item.id);
+        .eq('bien_so', item.bien_so);
 
       if (error) throw error;
 
-      // Cập nhật lại UI ngay lập tức
-      setDanhSach((prev) => prev.filter((x) => x.id !== item.id));
+      setDanhSach((prev) => prev.filter((x) => x.bien_so !== item.bien_so));
       alert(`Đã xóa thành công xe ${item.bien_so}!`);
     } catch (err: any) {
       alert('Lỗi xóa khách hàng: ' + err.message);
@@ -411,15 +410,27 @@ export default function KhachHangHenPage() {
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>
                   Biển số xe <span style={{ color: '#ef4444' }}>*</span>
+                  {isEditing && <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal', marginLeft: '6px' }}>(Khóa chính - Không được sửa)</span>}
                 </label>
                 <input
                   type="text"
                   placeholder="VD: 93A46410"
                   value={formData.bien_so}
                   onChange={(e) => setFormData({ ...formData, bien_so: e.target.value.toUpperCase() })}
+                  disabled={isEditing}
                   required
-                  style={{ ...inputStyle, textTransform: 'uppercase', fontWeight: 'bold' }}
+                  style={{ ...inputStyle, textTransform: 'uppercase',
+                        fontWeight: 'bold',
+                        backgroundColor: isEditing ? '#f1f5f9' : '#fff',
+                        color: isEditing ? '#64748b' : '#0f172a',
+                        cursor: isEditing ? 'not-allowed' : 'text',
+                        borderColor: isEditing ? '#cbd5e1' : '#94a3b8', }}
                 />
+                    {isEditing && (
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '14px' }}>
+                        🔒
+                    </span>
+                    )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', marginBottom: '14px' }}>
