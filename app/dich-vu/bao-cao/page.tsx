@@ -17,7 +17,6 @@ export default function BaoCaoDichVuPage() {
   // 1. Tải danh mục Cố vấn (CVDV) và Hạng mục dịch vụ
   async function loadDanhMucLoc() {
     try {
-      // Lấy danh sách cố vấn thuộc bộ phận CVDV
       const { data: nvData } = await supabase
         .from('nhan_vien')
         .select('ma_nv, ho_ten, bo_phan, vi_tri')
@@ -34,7 +33,6 @@ export default function BaoCaoDichVuPage() {
         if (allNv) setDanhSachCoVan(allNv);
       }
 
-      // Lấy danh mục hạng mục dịch vụ
       const { data: hmData } = await supabase
         .from('cau_hinh_hang_muc')
         .select('*')
@@ -99,7 +97,7 @@ export default function BaoCaoDichVuPage() {
     handleLoc(homNay, homNay);
   }, []);
 
-  // 4. Xuất file Excel (CSV UTF-8 BOM)
+  // 4. Xuất file Excel CSV thông thường
   function handleXuatExcel() {
     if (duLieuBaoCao.length === 0) return alert('Không có dữ liệu để xuất!');
     
@@ -134,22 +132,19 @@ export default function BaoCaoDichVuPage() {
     link.click();
     document.body.removeChild(link);
   }
- 
-  // Hàm xuất Báo Cáo Ngày đúng mẫu Excel đại lý
+
+  // 5. Xuất Báo Cáo Ngày đúng mẫu Excel đại lý (STT tự tăng + Font lớn)
   function handleXuatBaoCaoNgayMau() {
     if (duLieuBaoCao.length === 0) {
       alert('Không có dữ liệu trong khoảng thời gian đã chọn để xuất báo cáo!');
       return;
     }
 
-    // Format ngày DD/MM/YYYY
     const dParts = tuNgay.split('-');
     const ngayHienThi = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : tuNgay;
     const tongSoXe = duLieuBaoCao.length;
 
-    // Tạo các dòng dữ liệu với đúng style màu sắc & căn lề
-    const tableRows = duLieuBaoCao.map((r) => {
-      // Tách mã nhân viên để lấy tên Cố vấn (VD: "FNV-160 Thiều Minh Tài" -> "Thiều Minh Tài")
+    const tableRows = duLieuBaoCao.map((r, idx) => {
       let tenCoVanRaw = r.co_van_vien || r.ten_co_van || '';
       const parts = tenCoVanRaw.trim().split(' ');
       if (parts.length > 1 && parts[0].toUpperCase().startsWith('FNV')) {
@@ -161,7 +156,7 @@ export default function BaoCaoDichVuPage() {
 
       return `
         <tr>
-          <td style="border: 1px solid #000; text-align: center; mso-number-format:'\\@';">1</td>
+          <td style="border: 1px solid #000; text-align: center; mso-number-format:'0';">${idx + 1}</td>
           <td style="border: 1px solid #000; text-align: center; font-weight: bold; mso-number-format:'\\@';">${r.bien_so || ''}</td>
           <td style="border: 1px solid #000; text-align: left;">${r.ten_khach_hang || ''}</td>
           <td style="border: 1px solid #000; text-align: left; color: #dc2626; font-weight: 500;">${tenCoVanRaw}</td>
@@ -171,7 +166,6 @@ export default function BaoCaoDichVuPage() {
       `;
     }).join('');
 
-    // Khung HTML chuẩn Excel (XML/HTML Table)
     const excelTemplate = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -182,9 +176,7 @@ export default function BaoCaoDichVuPage() {
             <x:ExcelWorksheets>
               <x:ExcelWorksheet>
                 <x:Name>BC_NGAY</x:Name>
-                <x:WorksheetOptions>
-                  <x:DisplayGridlines/>
-                </x:WorksheetOptions>
+                <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
               </x:ExcelWorksheet>
             </x:ExcelWorksheets>
           </x:ExcelWorkbook>
@@ -196,29 +188,25 @@ export default function BaoCaoDichVuPage() {
       </head>
       <body>
         <table style="border-collapse: collapse; width: 100%;">
-          <!-- Dòng 1: BÁO CÁO NGÀY -->
-          <tr>
-            <td colspan="3" style="text-align: right; font-weight: bold; font-size: 13pt;">BÁO CÁO NGÀY:</td>
-            <td colspan="3" style="text-align: left; font-weight: bold; font-size: 13pt; color: #dc2626;">${ngayHienThi}</td>
+          <tr style="height: 35px;">
+            <td colspan="3" style="text-align: right; font-weight: 900; font-size: 16pt; font-family: 'Times New Roman', sans-serif;">BÁO CÁO NGÀY:</td>
+            <td colspan="3" style="text-align: left; font-weight: 900; font-size: 16pt; color: #dc2626; font-family: 'Times New Roman', sans-serif;">${ngayHienThi}</td>
           </tr>
-          <!-- Dòng 2: TỔNG SỐ XE THỰC HIỆN TRONG NGÀY -->
-          <tr>
-            <td colspan="3" style="text-align: right; font-weight: bold; font-size: 12pt;">TỔNG SỐ XE THỰC HIỆN TRONG NGÀY:</td>
-            <td colspan="3" style="text-align: left; font-weight: bold; font-size: 12pt; color: #dc2626;">${tongSoXe}</td>
+          <tr style="height: 32px;">
+            <td colspan="3" style="text-align: right; font-weight: 900; font-size: 15pt; font-family: 'Times New Roman', sans-serif;">TỔNG SỐ XE THỰC HIỆN TRONG NGÀY:</td>
+            <td colspan="3" style="text-align: left; font-weight: 900; font-size: 15pt; color: #dc2626; font-family: 'Times New Roman', sans-serif;">${tongSoXe}</td>
           </tr>
-          <tr><td colspan="6" style="height: 10px;"></td></tr>
+          <tr style="height: 8px;"><td colspan="6"></td></tr>
           
-          <!-- Dòng Header bảng -->
-          <tr style="background-color: #FCD5B4; height: 35px;">
-            <th style="border: 1px solid #000; width: 50px; text-align: center; font-weight: bold;">STT</th>
-            <th style="border: 1px solid #000; width: 130px; text-align: center; font-weight: bold;">BIỂN SỐ</th>
-            <th style="border: 1px solid #000; width: 220px; text-align: center; font-weight: bold;">TÊN<br/>KHÁCH HÀNG</th>
-            <th style="border: 1px solid #000; width: 180px; text-align: center; font-weight: bold;">TÊN<br/>CỐ VẤN</th>
-            <th style="border: 1px solid #000; width: 180px; text-align: center; font-weight: bold;">HẠNG MỤC<br/>THỰC HIỆN</th>
-            <th style="border: 1px solid #000; width: 130px; text-align: center; font-weight: bold;">TRẠNG THÁI<br/>HẸN</th>
+          <tr style="background-color: #FCD5B4; height: 38px;">
+            <th style="border: 1px solid #000; width: 50px; text-align: center; font-weight: bold; font-size: 11pt;">STT</th>
+            <th style="border: 1px solid #000; width: 130px; text-align: center; font-weight: bold; font-size: 11pt;">BIỂN SỐ</th>
+            <th style="border: 1px solid #000; width: 220px; text-align: center; font-weight: bold; font-size: 11pt;">TÊN<br/>KHÁCH HÀNG</th>
+            <th style="border: 1px solid #000; width: 180px; text-align: center; font-weight: bold; font-size: 11pt;">TÊN<br/>CỐ VẤN</th>
+            <th style="border: 1px solid #000; width: 180px; text-align: center; font-weight: bold; font-size: 11pt;">HẠNG MỤC<br/>THỰC HIỆN</th>
+            <th style="border: 1px solid #000; width: 130px; text-align: center; font-weight: bold; font-size: 11pt;">TRẠNG THÁI<br/>HẸN</th>
           </tr>
 
-          <!-- Dữ liệu -->
           ${tableRows}
         </table>
       </body>
