@@ -53,28 +53,77 @@ export const DANH_MUC_QUYEN = [
 // Tất cả mã quyền gộp lại (dùng cho nút Chọn hết hoặc ADMIN)
 export const TAT_CA_MA_QUYEN = DANH_MUC_QUYEN.flatMap((g) => g.danhSach.map((q) => q.id));
 
-// Hàm tính Badge tóm tắt quyền hiển thị ở bảng bên phải
-export function layBadgeQuyen(phanQuyenStr) {
-  if (!phanQuyenStr || phanQuyenStr === 'Chưa cấp quyền') {
-    return { text: 'Chưa cấp quyền', bg: '#f1f5f9', color: '#64748b' };
+// Hàm hiển thị huy hiệu các mục được phép truy cập chuyên nghiệp
+export function layBadgeQuyen(phanQuyen) {
+  if (phanQuyen === 'LOCKED') {
+    return [
+      { text: 'Khóa tài khoản', bg: '#fee2e2', color: '#dc2626' }
+    ];
   }
-  if (phanQuyenStr === 'ADMIN') {
-    return { text: 'Toàn quyền hệ thống', bg: '#fef3c7', color: '#d97706' };
+  if (phanQuyen === 'ADMIN') {
+    return [
+      { text: 'Toàn quyền (ADMIN)', bg: '#dcfce7', color: '#15803d' }
+    ];
   }
-  if (phanQuyenStr === 'ACTIVE') {
-    return { text: 'Mở khóa (Chờ gán quyền)', bg: '#e0f2fe', color: '#0284c7' };
-  }
-  if (phanQuyenStr === 'LOCKED') {
-    return { text: 'Tài khoản khóa', bg: '#fee2e2', color: '#dc2626' };
+  if (!phanQuyen || phanQuyen === 'ACTIVE') {
+    return [
+      { text: 'Chưa cấp quyền', bg: '#f1f5f9', color: '#64748b' }
+    ];
   }
 
-  const dsQuyen = phanQuyenStr.split(',').map((x) => x.trim());
+  const dsQuyen = phanQuyen.split(',').map((x) => x.trim()).filter(Boolean);
+  if (dsQuyen.length === 0) {
+    return [{ text: 'Chưa cấp quyền', bg: '#f1f5f9', color: '#64748b' }];
+  }
 
-  // Kiểm tra quyền Xe demo (cập nhật hiển thị theo tối đa 5 quyền)
-  const quyenDemo = dsQuyen.filter((x) => x.startsWith('DEMO_'));
+  // Gom nhóm theo từng phân hệ thực tế
+  const nhomTags = [];
+
+  // 1. Phân hệ Dịch Vụ Đại Lý
+  const quyenDichVu = dsQuyen.filter((q) => q.startsWith('TN_') || q.startsWith('HEN_') || q.startsWith('BC_'));
+  if (quyenDichVu.length > 0) {
+    nhomTags.push({
+      text: `Dịch Vụ (${quyenDichVu.length})`,
+      bg: '#e0f2fe',
+      color: '#0369a1',
+      title: quyenDichVu.join(', '),
+    });
+  }
+
+  // 2. Xe Demo
+  const quyenDemo = dsQuyen.filter((q) => q.includes('DEMO'));
   if (quyenDemo.length > 0) {
-    return { text: `Xe Demo (${quyenDemo.length}/5)`, bg: '#fef9c3', color: '#a16207' };
+    nhomTags.push({
+      text: `Xe Demo (${quyenDemo.length})`,
+      bg: '#fef3c7',
+      color: '#b45309',
+      title: quyenDemo.join(', '),
+    });
   }
 
-  return { text: `Đã cấp (${dsQuyen.length} mục)`, bg: '#dcfce7', color: '#15803d' };
+  // 3. Đặt Hoa
+  const quyenHoa = dsQuyen.filter((q) => q.includes('HOA'));
+  if (quyenHoa.length > 0) {
+    nhomTags.push({
+      text: `Đặt Hoa (${quyenHoa.length})`,
+      bg: '#fce7f3',
+      color: '#be185d',
+      title: quyenHoa.join(', '),
+    });
+  }
+
+  // 4. Quản Lý Nhân Sự / Khác
+  const quyenKhac = dsQuyen.filter(
+    (q) => !q.startsWith('TN_') && !q.startsWith('HEN_') && !q.startsWith('BC_') && !q.includes('DEMO') && !q.includes('HOA')
+  );
+  if (quyenKhac.length > 0) {
+    nhomTags.push({
+      text: `Khác (${quyenKhac.length})`,
+      bg: '#f1f5f9',
+      color: '#475569',
+      title: quyenKhac.join(', '),
+    });
+  }
+
+  return nhomTags.length > 0 ? nhomTags : [{ text: `${dsQuyen.length} quyền`, bg: '#e0f2fe', color: '#0369a1' }];
 }
