@@ -11,6 +11,11 @@ export default function TiepNhanXePage() {
   const [loading, setLoading] = useState(false);
   const [dangTraCuu, setDangTraCuu] = useState(false);
 
+  // Modal Sửa state
+  const [modalEditOpen, setModalEditOpen] = useState(false);
+  const [editRow, setEditRow] = useState<any>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Form state
   const [form, setForm] = useState({
     bien_so: '',
@@ -35,7 +40,6 @@ export default function TiepNhanXePage() {
       if (cvData && cvData.length > 0) {
         setDanhSachCoVan(cvData);
       } else {
-        // Fallback lấy toàn bộ nhân viên nếu chưa gắn nhãn CVDV
         const { data: allNv } = await supabase
           .from('nhan_vien')
           .select('ma_nv, ho_ten')
@@ -100,7 +104,6 @@ export default function TiepNhanXePage() {
 
     setDangTraCuu(true);
     try {
-      // Tìm theo biển số chính xác hoặc tương đối
       const { data, error } = await supabase
         .from('dich_vu_khach_hang')
         .select('*')
@@ -155,7 +158,6 @@ export default function TiepNhanXePage() {
 
       if (insertErr) throw insertErr;
 
-      // Cập nhật hoặc lưu mới vào danh bạ khách hàng
       await supabase.from('dich_vu_khach_hang').upsert(
         {
           bien_so: bs,
@@ -168,7 +170,6 @@ export default function TiepNhanXePage() {
         { onConflict: 'bien_so' }
       );
 
-      // Reset form
       setForm({
         bien_so: '',
         ten_khach_hang: '',
@@ -188,6 +189,93 @@ export default function TiepNhanXePage() {
     }
   }
 
+  // 4. Kiểm tra khóa (Khóa sau 18h00 hoặc khi qua ngày khác)
+  function kiemTraBiKhoa(thoiGianStr: string) {
+    if (!thoiGianStr) return true;
+    const rowTime = new Date(thoiGianStr);
+    const now = new Date();
+
+    const rowDateStr = rowTime.toLocaleDateString('vi-VN');
+    const nowDateStr = now.toLocaleDateString('vi-VN');
+
+    // Khác ngày -> Khóa
+    if (rowDateStr !== nowDateStr) {
+      return true;
+    }
+
+    // Cùng ngày nhưng hiện tại đã từ 18:00 trở đi -> Khóa
+    if (now.getHours() >= 18) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // 5. Mở modal Sửa
+  function handleOpenEdit(row: any) {
+    if (kiemTraBiKhoa(row.thoi_gian)) {
+      alert('Lượt tiếp nhận này đã bị khóa (sau 18h00 hoặc đã qua ngày), không thể sửa!');
+      return;
+    }
+    setEditRow({ ...row });
+    setModalEditOpen(true);
+  }
+
+  // 6. Lưu Sửa
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editRow) return;
+
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from('dich_vu_tiep_nhan')
+        .update({
+          ten_khach_hang: editRow.ten_khach_hang,
+          so_dien_thoai: editRow.so_dien_thoai,
+          co_van_vien: editRow.co_van_vien,
+          hang_muc_thuc_hien: editRow.hang_muc_thuc_hien,
+          trang_thai_hen: editRow.trang_thai_hen,
+          ghi_chu: editRow.ghi_chu,
+        })
+        .eq('no_id', editRow.no_id);
+
+      if (error) throw error;
+      alert(`Đã cập nhật lượt tiếp nhận xe ${editRow.bien_so}!`);
+      setModalEditOpen(false);
+      loadInitData();
+    } catch (err: any) {
+      alert('Lỗi cập nhật: ' + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // 7. Xóa lượt tiếp nhận
+  async function handleDelete(row: any) {
+    if (kiemTraBiKhoa(row.thoi_gian)) {
+      alert('Lượt tiếp nhận này đã bị khóa (sau 18h00 hoặc đã qua ngày), không thể xóa!');
+      return;
+    }
+
+    if (!confirm(`Bạn có chắc chắn muốn xóa lượt tiếp nhận xe ${row.bien_so} (NO: ${row.no_id})?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('dich_vu_tiep_nhan')
+        .delete()
+        .eq('no_id', row.no_id);
+
+      if (error) throw error;
+      setNhatKy((prev) => prev.filter((x) => x.no_id !== row.no_id));
+      alert(`Đã xóa lượt tiếp nhận xe ${row.bien_so}!`);
+    } catch (err: any) {
+      alert('Lỗi xóa tiếp nhận: ' + err.message);
+    }
+  }
+
   return (
     <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '360px 1fr', gap: '20px', backgroundColor: '#f8fafc', minHeight: '100vh', boxSizing: 'border-box' }}>
       
@@ -198,7 +286,6 @@ export default function TiepNhanXePage() {
         </h3>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Biển số xe */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
               <label style={labelStyle}>Biển số *</label>
@@ -215,7 +302,6 @@ export default function TiepNhanXePage() {
             />
           </div>
 
-          {/* Tên khách hàng & Số điện thoại */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
             <div>
               <label style={labelStyle}>Khách hàng *</label>
@@ -240,7 +326,6 @@ export default function TiepNhanXePage() {
             </div>
           </div>
 
-          {/* Cố vấn viên */}
           <div>
             <label style={labelStyle}>Cố vấn viên *</label>
             <select
@@ -258,7 +343,6 @@ export default function TiepNhanXePage() {
             </select>
           </div>
 
-          {/* Hạng mục thực hiện & Trạng thái hẹn */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
             <div>
               <label style={labelStyle}>Hạng mục thực hiện *</label>
@@ -294,7 +378,6 @@ export default function TiepNhanXePage() {
             </div>
           </div>
 
-          {/* Ghi chú */}
           <div>
             <label style={labelStyle}>Ghi chú</label>
             <input
@@ -306,7 +389,6 @@ export default function TiepNhanXePage() {
             />
           </div>
 
-          {/* Nút bấm */}
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
             <button
               type="button"
@@ -389,40 +471,234 @@ export default function TiepNhanXePage() {
                   </td>
                 </tr>
               ) : (
-                nhatKy.map((row, index) => (
-                  <tr key={row.no_id || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px', fontWeight: 'bold' }}>{row.no_id || index + 1}</td>
-                    <td style={{ padding: '10px', color: '#64748b' }}>
-                      {row.thoi_gian ? new Date(row.thoi_gian).toLocaleString('vi-VN') : '---'}
-                    </td>
-                    <td style={{ padding: '10px', color: '#0284c7', fontWeight: 'bold' }}>{row.bien_so}</td>
-                    <td style={{ padding: '10px', fontWeight: '500' }}>{row.ten_khach_hang}</td>
-                    <td style={{ padding: '10px' }}>{row.co_van_vien || row.ten_co_van || '---'}</td>
-                    <td style={{ padding: '10px' }}>
-                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0' }}>
-                        {row.hang_muc_thuc_hien || row.hang_muc || '---'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
-                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontSize: '11px', fontWeight: 'bold' }}>
-                        {row.trang_thai_hen || '24H'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
-                      <button
-                        type="button"
-                        style={{ border: '1px solid #cbd5e1', background: '#fff', borderRadius: '4px', padding: '2px 6px', fontSize: '11px', cursor: 'pointer' }}
-                      >
-                        🔒 Khóa
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                nhatKy.map((row, index) => {
+                  const daKhoa = kiemTraBiKhoa(row.thoi_gian);
+
+                  return (
+                    <tr key={row.no_id || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px', fontWeight: 'bold' }}>{row.no_id || index + 1}</td>
+                      <td style={{ padding: '10px', color: '#64748b' }}>
+                        {row.thoi_gian ? new Date(row.thoi_gian).toLocaleString('vi-VN') : '---'}
+                      </td>
+                      <td style={{ padding: '10px', color: '#0284c7', fontWeight: 'bold' }}>{row.bien_so}</td>
+                      <td style={{ padding: '10px', fontWeight: '500' }}>{row.ten_khach_hang}</td>
+                      <td style={{ padding: '10px' }}>{row.co_van_vien || row.ten_co_van || '---'}</td>
+                      <td style={{ padding: '10px' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0' }}>
+                          {row.hang_muc_thuc_hien || row.hang_muc || '---'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontSize: '11px', fontWeight: 'bold' }}>
+                          {row.trang_thai_hen || '24H'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        {daKhoa ? (
+                          <span
+                            title="Đã khóa (sau 18h00 hoặc qua ngày)"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#f8fafc',
+                              color: '#64748b',
+                              fontSize: '11px',
+                              fontWeight: '500',
+                              cursor: 'not-allowed',
+                            }}
+                          >
+                            🔒 Khóa
+                          </span>
+                        ) : (
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(row)}
+                              title="Sửa thông tin"
+                              style={{
+                                padding: '3px 7px',
+                                backgroundColor: '#fff',
+                                border: '1px solid #bae6fd',
+                                color: '#0284c7',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(row)}
+                              title="Xóa tiếp nhận"
+                              style={{
+                                padding: '3px 7px',
+                                backgroundColor: '#fff',
+                                border: '1px solid #fecaca',
+                                color: '#dc2626',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* MODAL SỬA LƯỢT TIẾP NHẬN */}
+      {modalEditOpen && editRow && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '10px',
+              width: '100%',
+              maxWidth: '440px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>
+                ✏️ Chỉnh Sửa Tiếp Nhận: {editRow.bien_so}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalEditOpen(false)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#94a3b8' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Tên khách hàng</label>
+                <input
+                  type="text"
+                  value={editRow.ten_khach_hang || ''}
+                  onChange={(e) => setEditRow({ ...editRow, ten_khach_hang: e.target.value })}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Số điện thoại</label>
+                <input
+                  type="text"
+                  value={editRow.so_dien_thoai || ''}
+                  onChange={(e) => setEditRow({ ...editRow, so_dien_thoai: e.target.value })}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Cố vấn viên</label>
+                <select
+                  value={editRow.co_van_vien || ''}
+                  onChange={(e) => setEditRow({ ...editRow, co_van_vien: e.target.value })}
+                  required
+                  style={inputStyle}
+                >
+                  {danhSachCoVan.map((cv) => (
+                    <option key={cv.ma_nv} value={`${cv.ma_nv} ${cv.ho_ten}`}>
+                      {cv.ma_nv} - {cv.ho_ten}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={labelStyle}>Hạng mục</label>
+                  <select
+                    value={editRow.hang_muc_thuc_hien || ''}
+                    onChange={(e) => setEditRow({ ...editRow, hang_muc_thuc_hien: e.target.value })}
+                    style={inputStyle}
+                  >
+                    {dsHangMuc.map((item, idx) => (
+                      <option key={item.id || idx} value={item.ma_hang_muc}>
+                        {item.ma_hang_muc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Trạng thái hẹn</label>
+                  <select
+                    value={editRow.trang_thai_hen || '24H'}
+                    onChange={(e) => setEditRow({ ...editRow, trang_thai_hen: e.target.value })}
+                    style={inputStyle}
+                  >
+                    {dsTrangThai.map((item, idx) => (
+                      <option key={item.id || idx} value={item.ma_trang_thai}>
+                        {item.ma_trang_thai}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Ghi chú</label>
+                <input
+                  type="text"
+                  value={editRow.ghi_chu || ''}
+                  onChange={(e) => setEditRow({ ...editRow, ghi_chu: e.target.value })}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalEditOpen(false)}
+                  disabled={savingEdit}
+                  style={{ padding: '7px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  style={{ padding: '7px 18px', borderRadius: '4px', border: 'none', background: '#0284c7', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
