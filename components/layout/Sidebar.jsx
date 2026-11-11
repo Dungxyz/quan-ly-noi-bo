@@ -50,7 +50,6 @@ export default function Sidebar() {
     },
   ];
 
-  // 3 module con của Dịch Vụ Đại Lý với từng mã quyền xem riêng biệt
   const dichVuChildren = [
     {
       name: 'Tiếp nhận xe',
@@ -68,7 +67,7 @@ export default function Sidebar() {
       name: 'Báo cáo dịch vụ',
       path: '/dich-vu/bao-cao',
       icon: '📊',
-      moduleKey: 'BC_VIEW', // Tách riêng mã quyền xem báo cáo
+      moduleKey: 'BC_VIEW',
     },
   ];
 
@@ -89,9 +88,17 @@ export default function Sidebar() {
     return false;
   }
 
+  // Nhãn hiển thị vai trò ngắn gọn (Không in chuỗi mã dài)
+  function layNhanVaiTro(role) {
+    if (role === 'LOCKED') return { text: 'Khóa', bg: '#dc2626' };
+    if (role === 'ADMIN' || role === 'ALL') return { text: 'ADMIN', bg: '#16a34a' };
+    return { text: 'Nhân viên', bg: '#0284c7' };
+  }
+
+  const roleBadge = layNhanVaiTro(currentUser?.phan_quyen);
   const isDichVuActive = dichVuChildren.some((child) => pathname === child.path);
 
-  // Chỉ hiển thị menu cha "Dịch Vụ Đại Lý" nếu có ít nhất 1 quyền con
+  // Chỉ hiển thị menu cha "Dịch Vụ Đại Lý" nếu có ít nhất 1 menu con được phép
   const coQuyenDichVu = dichVuChildren.some((child) => checkQuyen(child.moduleKey, false));
 
   return (
@@ -154,16 +161,11 @@ export default function Sidebar() {
                     padding: '2px 8px',
                     borderRadius: '10px',
                     fontWeight: 'bold',
-                    backgroundColor:
-                      currentUser.phan_quyen === 'LOCKED'
-                        ? '#dc2626'
-                        : currentUser.phan_quyen === 'ADMIN'
-                        ? '#16a34a'
-                        : '#0284c7',
+                    backgroundColor: roleBadge.bg,
                     color: '#fff',
                   }}
                 >
-                  {currentUser.phan_quyen}
+                  {roleBadge.text}
                 </span>
               </div>
 
@@ -204,34 +206,13 @@ export default function Sidebar() {
             Phân hệ chức năng
           </div>
 
+          {/* MENU CHÍNH: KHÔNG CÓ QUYỀN THÌ ẨN LUÔN (return null) */}
           {menuItems.map((item) => {
             const duocPhep = checkQuyen(item.moduleKey, item.isPublic);
             const dangChon = pathname === item.path;
 
-            if (!duocPhep) {
-              return (
-                <div
-                  key={item.path}
-                  title="Tài khoản không đủ quyền truy cập"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 14px',
-                    borderRadius: '6px',
-                    color: '#475569',
-                    cursor: 'not-allowed',
-                    opacity: 0.5,
-                  }}
-                >
-                  <span style={{ fontSize: '18px' }}>{item.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600' }}>{item.title}</div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>🔒 Bị khóa quyền</div>
-                  </div>
-                </div>
-              );
-            }
+            // Ẩn hoàn toàn nếu không có quyền
+            if (!duocPhep) return null;
 
             return (
               <Link
@@ -258,7 +239,7 @@ export default function Sidebar() {
             );
           })}
 
-          {/* Cụm menu: DỊCH VỤ ĐẠI LÝ */}
+          {/* Cụm menu: DỊCH VỤ ĐẠI LÝ (Chỉ hiện nếu có quyền ít nhất 1 mục) */}
           {coQuyenDichVu && (
             <div style={{ marginTop: '8px' }}>
               <div
@@ -284,7 +265,7 @@ export default function Sidebar() {
                 <span style={{ fontSize: '11px', color: '#64748b' }}>{openDichVu ? '▼' : '▶'}</span>
               </div>
 
-              {/* Danh mục con của Dịch Vụ */}
+              {/* Menu con của Dịch Vụ */}
               {openDichVu && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingLeft: '28px' }}>
                   {dichVuChildren.map((sub) => {
@@ -358,8 +339,7 @@ export default function Sidebar() {
             </h3>
             <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b', lineHeight: '1.5' }}>
               Bạn có chắc chắn muốn rời khỏi phiên làm việc của nhân sự{' '}
-              <strong style={{ color: '#0284c7' }}>{currentUser?.ho_ten}</strong> (
-              {currentUser?.ma_nv}) không?
+              <strong style={{ color: '#0284c7' }}>{currentUser?.ho_ten}</strong> ({currentUser?.ma_nv}) không?
             </p>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
