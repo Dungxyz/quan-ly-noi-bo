@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { AuthProvider } from '@/context/AuthContext';
 import Sidebar from '@/components/layout/Sidebar';
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';
 
@@ -18,9 +18,7 @@ export default function RootLayout({ children }) {
           ) : (
             <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
               <Sidebar />
-              <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
-                {children}
-              </main>
+              <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>{children}</main>
             </div>
           )}
         </AuthProvider>
