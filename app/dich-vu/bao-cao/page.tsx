@@ -3,12 +3,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function BaoCaoDichVuPage() {
-  // Lấy ngày hiện tại dạng YYYY-MM-DD
-  const homNay = new Date().toISOString().split('T')[0];
-
-  const [tuNgay, setTuNgay] = useState(homNay);
-  const [denNgay, setDenNgay] = useState(homNay);
+export default function BaoCaoDichVuPage() {export default function BaoCaoDichVuPage() {
+  const [tuNgay, setTuNgay] = useState('');
+  const [denNgay, setDenNgay] = useState('');
   const [coVan, setCoVan] = useState('');
   const [hangMuc, setHangMuc] = useState('');
   
@@ -17,26 +14,20 @@ export default function BaoCaoDichVuPage() {
   const [duLieuBaoCao, setDuLieuBaoCao] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 1. Nạp danh sách Cố vấn (CVDV) và Hạng mục vào 2 ô lọc
-  async function loadDanhMucLoc() {
-    try {
-      // Nạp Cố vấn viên thuộc bộ phận CVDV
-      const { data: nvData } = await supabase
-        .from('nhan_vien')
-        .select('ma_nv, ho_ten, bo_phan, vi_tri')
-        .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
-        .order('ma_nv', { ascending: true });
+  // 1. Khởi tạo ngày hiện tại và nạp danh mục ở Client
+  useEffect(() => {
+    const homNay = new Date().toISOString().split('T')[0];
+    setTuNgay(homNay);
+    setDenNgay(homNay);
+    loadDanhMucLoc();
+  }, []);
 
-      if (nvData && nvData.length > 0) {
-        setDanhSachCoVan(nvData);
-      } else {
-        const { data: allNv } = await supabase
-          .from('nhan_vien')
-          .select('ma_nv, ho_ten')
-          .order('ma_nv', { ascending: true });
-        if (allNv) setDanhSachCoVan(allNv);
-      }
-
+  // 2. Tự động lọc dữ liệu khi ngày bắt đầu và kết thúc đã được gán
+  useEffect(() => {
+    if (tuNgay && denNgay) {
+      handleLoc();
+    }
+  }, [tuNgay, denNgay]);
       // Nạp danh mục Hạng mục từ bảng cấu hình
       const { data: hmData } = await supabase
         .from('cau_hinh_hang_muc')
