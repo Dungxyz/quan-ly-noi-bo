@@ -29,6 +29,8 @@ export default function KhachHangHenPage() {
   const [danhSachCoVan, setDanhSachCoVan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tuKhoa, setTuKhoa] = useState('');
+    const [dsHangMuc, setDsHangMuc] = useState<any[]>([]);
+    const [dsTrangThai, setDsTrangThai] = useState<any[]>([]);
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -174,6 +176,39 @@ export default function KhachHangHenPage() {
       kh.so_dien_thoai?.includes(q) ||
       kh.co_van?.toLowerCase().includes(q)
     );
+
+    async function loadDanhMuc() {
+  // 1. Chỉ lấy nhân viên thuộc bộ phận CVDV (hoặc có vị trí CVDV)
+  const { data: nvData } = await supabase
+    .from('nhan_vien')
+    .select('ma_nv, ho_ten, bo_phan, vi_tri')
+    .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
+    .order('ma_nv', { ascending: true });
+
+  if (nvData) setDanhSachCoVan(nvData);
+
+  // 2. Lấy danh sách hạng mục từ bảng cấu hình
+  const { data: hmData } = await supabase
+    .from('cau_hinh_hang_muc')
+    .select('*')
+    .order('thu_tu', { ascending: true });
+
+  if (hmData && hmData.length > 0) setDsHangMuc(hmData);
+
+  // 3. Lấy danh sách trạng thái hẹn từ bảng cấu hình
+  const { data: ttData } = await supabase
+    .from('cau_hinh_trang_thai_hen')
+    .select('*')
+    .order('thu_tu', { ascending: true });
+
+  if (ttData && ttData.length > 0) setDsTrangThai(ttData);
+}
+
+useEffect(() => {
+  loadData();
+  loadDanhMuc();
+}, []);
+
   });
 
   return (
@@ -462,24 +497,52 @@ export default function KhachHangHenPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
-                  <label style={labelStyle}>Hạng mục dự kiến</label>
-                  <select
-                    value={formData.hang_muc_du_kien}
-                    onChange={(e) => setFormData({ ...formData, hang_muc_du_kien: e.target.value })}
-                    style={inputStyle}
-                  >
-                    <option value="BDĐK">BDĐK</option>
-                    <option value="ĐSBH">ĐSBH</option>
-                    <option value="FSA">FSA</option>
-                    <option value="KT 20HM">KT 20HM</option>
-                    <option value="TTPT">TTPT</option>
-                    <option value="Thay nhớt">Thay nhớt</option>
-                    <option value="Kiểm tra xe">Kiểm tra xe</option>
-                    <option value="Xe kéo về">Xe kéo về</option>
-                    <option value="Làm HSBH">Làm HSBH</option>
-                    <option value="Thay áp suất lốp">Thay áp suất lốp</option>
-                  </select>
-                </div>
+                    <label style={labelStyle}>Hạng mục dự kiến</label>
+                    <select
+                        value={formData.hang_muc_du_kien}
+                        onChange={(e) => setFormData({ ...formData, hang_muc_du_kien: e.target.value })}
+                        style={inputStyle}
+                    >
+                        {dsHangMuc.map((item) => (
+                        <option key={item.id} value={item.ma_hang_muc}>
+                            {item.ten_hang_muc || item.ma_hang_muc}
+                        </option>
+                        ))}
+                    </select>
+                    </div>
+
+                    {/* 2. Trạng thái hẹn */}
+                    <div>
+                    <label style={labelStyle}>Trạng thái hẹn</label>
+                    <select
+                        value={formData.trang_thai_hen}
+                        onChange={(e) => setFormData({ ...formData, trang_thai_hen: e.target.value })}
+                        style={inputStyle}
+                    >
+                        {dsTrangThai.map((item) => (
+                        <option key={item.id} value={item.ma_trang_thai}>
+                            {item.ten_trang_thai || item.ma_trang_thai}
+                        </option>
+                        ))}
+                    </select>
+                    </div>
+
+                    {/* 3. Cố vấn viên phụ trách (Chỉ nhân sự CVDV) */}
+                    <div style={{ marginBottom: '20px' }}>
+                    <label style={labelStyle}>Cố vấn viên phụ trách (CVDV)</label>
+                    <select
+                        value={formData.co_van}
+                        onChange={(e) => setFormData({ ...formData, co_van: e.target.value })}
+                        style={inputStyle}
+                    >
+                        <option value="">-- Chưa chỉ định --</option>
+                        {danhSachCoVan.map((nv) => (
+                        <option key={nv.ma_nv} value={`${nv.ma_nv} - ${nv.ho_ten}`}>
+                            {nv.ma_nv} - {nv.ho_ten}
+                        </option>
+                        ))}
+                    </select>
+                    </div>
 
                 <div>
                   <label style={labelStyle}>Trạng thái hẹn</label>
