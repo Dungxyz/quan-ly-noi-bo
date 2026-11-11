@@ -35,17 +35,18 @@ export const DS_VI_TRI = [
 
 export const CO_CAU_TO_CHUC = {
   'Ban giám đốc': ['Giám đốc Dịch vụ', 'Phó Giám đốc Chi nhánh', 'Giám đốc Kinh doanh', 'Giám đốc Chi nhánh'],
-  'CVDV': ['Trưởng Bộ phận', 'Cố vấn viên'],
+  'CVDV': ['Trưởng bộ phận', 'Cố vấn viên'],
   'Kinh doanh': ['Phó Giám đốc Kinh doanh', 'Tư vấn bán hàng'],
-  'DCRC': ['Trưởng Bộ phận', 'Nhân viên'],
+  'DCRC': ['Trưởng bộ phận', 'Nhân viên'],
   'Kế Toán': ['Kế toán trưởng', 'Kế toán viên', 'Thu ngân'],
   'HCNS': ['Phó phòng HCNS', 'Nhân viên IT', 'Nhân viên HCNS', 'Nhân viên bảo vệ', 'Nhân viên tạp vụ'],
   'Hỗ trợ kinh doanh': ['Đăng ký viên','Kho xe','Sale Admin']  ,
-  'Phụ tùng': ['Trưởng Bộ phận', 'Nhân viên'],
-  'Phụ kiện & Bảo hiểm': ['Trưởng Bộ phận', 'Nhân viên'],
+  'Phụ tùng': ['Trưởng bộ phận', 'Nhân viên'],
+  'Phụ kiện & Bảo hiểm': ['Trưởng bộ phận', 'Nhân viên'],
   'Sửa chữa chung': ['Quản đốc', 'Trưởng nhóm', 'Kỹ thuật viên'],
   'Đồng sơn': ['Quản đốc', 'Trưởng nhóm', 'Kỹ thuật viên'],
-
+  'Dich vụ': ['Lễ tân', 'Rửa xe'],
+  'Điều phối': ['Trưởng bộ phận', 'Điều phối viên'],
   // Sửa hoặc bổ sung thêm tại đây
 };
 
