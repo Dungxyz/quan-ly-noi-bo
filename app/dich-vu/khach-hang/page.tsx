@@ -49,13 +49,33 @@ export default function KhachHangHenPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('dich_vu_khach_hang')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let allRecords: KhachHangItem[] = [];
+      let from = 0;
+      const step = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      setDanhSach(data || []);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('dich_vu_khach_hang')
+          .select('*')
+          .order('bien_so', { ascending: true })
+          .range(from, from + step - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allRecords = [...allRecords, ...data];
+          if (data.length < step) {
+            hasMore = false;
+          } else {
+            from += step;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setDanhSach(allRecords);
     } catch (err: any) {
       alert('Lỗi nạp danh sách khách hàng: ' + err.message);
     } finally {
