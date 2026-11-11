@@ -26,10 +26,11 @@ const FORM_MAC_DINH: KhachHangItem = {
 export default function KhachHangHenPage() {
   const { currentUser, kiemTraQuyen } = useAuth();
   const [danhSach, setDanhSach] = useState<KhachHangItem[]>([]);
+  const [tongSoKhach, setTongSoKhach] = useState(0);
   const [danhSachCoVan, setDanhSachCoVan] = useState<any[]>([]);
   const [dsHangMuc, setDsHangMuc] = useState<any[]>([]);
   const [dsTrangThai, setDsTrangThai] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [tuKhoa, setTuKhoa] = useState('');
 
   // Modal State
@@ -38,115 +39,81 @@ export default function KhachHangHenPage() {
   const [formData, setFormData] = useState<KhachHangItem>(FORM_MAC_DINH);
   const [saving, setSaving] = useState(false);
 
-  // Phân quyền chi tiết
+  // Phân quyền
   const role = currentUser?.phan_quyen || '';
   const isAdmin = role === 'ADMIN' || role === 'ALL';
   const canAdd = isAdmin || role.includes('HEN_ADD') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('HEN_ADD'));
   const canEdit = isAdmin || role.includes('HEN_EDIT') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('HEN_EDIT'));
   const canDelete = isAdmin || role.includes('HEN_DELETE') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('HEN_DELETE'));
 
-  // 1. Tải dữ liệu khách hàng
-  async function loadData() {
-    try {
-      setLoading(true);
-      let allRecords: KhachHangItem[] = [];
-      let from = 0;
-      const step = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('dich_vu_khach_hang')
-          .select('*')
-          .order('bien_so', { ascending: true })
-          .range(from, from + step - 1);
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          allRecords = [...allRecords, ...data];
-          if (data.length < step) {
-            hasMore = false;
-          } else {
-            from += step;
-          }
-        } else {
-          hasMore = false;
-        }
-      }
-
-      setDanhSach(allRecords);
-    } catch (err: any) {
-      alert('Lỗi nạp danh sách khách hàng: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // 2. Tải danh mục động (Hạng mục, Trạng thái hẹn, Cố vấn viên CVDV)
+  // 1. Tải danh mục Cố vấn CVDV, Hạng mục, Trạng thái
   async function loadDanhMuc() {
     try {
-      // Lấy nhân viên thuộc bộ phận CVDV
       const { data: nvData } = await supabase
         .from('nhan_vien')
         .select('ma_nv, ho_ten, bo_phan, vi_tri')
-        .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%CVDV%')
+        .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
         .order('ma_nv', { ascending: true });
 
       if (nvData && nvData.length > 0) {
         setDanhSachCoVan(nvData);
       } else {
-        // Fallback lấy toàn bộ nhân viên nếu chưa phân bộ phận CVDV
-        const { data: allNv } = await supabase
-          .from('nhan_vien')
-          .select('ma_nv, ho_ten')
-          .order('ma_nv', { ascending: true });
+        const { data: allNv } = await supabase.from('nhan_vien').select('ma_nv, ho_ten').order('ma_nv', { ascending: true });
         if (allNv) setDanhSachCoVan(allNv);
       }
 
-      // Lấy danh mục hạng mục
-      const { data: hmData } = await supabase
-        .from('cau_hinh_hang_muc')
-        .select('*')
-        .order('thu_tu', { ascending: true });
+      const { data: hmData } = await supabase.from('cau_hinh_hang_muc').select('*').order('thu_tu', { ascending: true });
+      if (hmData && hmData.length > 0) setDsHangMuc(hmData);
 
-      if (hmData && hmData.length > 0) {
-        setDsHangMuc(hmData);
-      } else {
-        // Danh mục dự phòng mặc định nếu chưa kịp tạo bảng
-        setDsHangMuc([
-          { ma_hang_muc: 'BDĐK', ten_hang_muc: 'BDĐK' },
-          { ma_hang_muc: 'ĐSBH', ten_hang_muc: 'ĐSBH' },
-          { ma_hang_muc: 'FSA', ten_hang_muc: 'FSA' },
-          { ma_hang_muc: 'KT 20HM', ten_hang_muc: 'KT 20HM' },
-          { ma_hang_muc: 'TTPT', ten_hang_muc: 'TTPT' },
-          { ma_hang_muc: 'Thay nhớt', ten_hang_muc: 'Thay nhớt' },
-          { ma_hang_muc: 'Kiểm tra xe', ten_hang_muc: 'Kiểm tra xe' },
-        ]);
-      }
-
-      // Lấy danh mục trạng thái hẹn
-      const { data: ttData } = await supabase
-        .from('cau_hinh_trang_thai_hen')
-        .select('*')
-        .order('thu_tu', { ascending: true });
-
-      if (ttData && ttData.length > 0) {
-        setDsTrangThai(ttData);
-      } else {
-        setDsTrangThai([
-          { ma_trang_thai: '24H', ten_trang_thai: '24H' },
-          { ma_trang_thai: 'H', ten_trang_thai: 'H (Hẹn trước)' },
-          { ma_trang_thai: 'XVL', ten_trang_thai: 'XVL (Xe vãng lai)' },
-        ]);
-      }
-    } catch (err: any) {
-      console.error('Lỗi nạp danh mục cấu hình:', err);
+      const { data: ttData } = await supabase.from('cau_hinh_trang_thai_hen').select('*').order('thu_tu', { ascending: true });
+      if (ttData && ttData.length > 0) setDsTrangThai(ttData);
+    } catch (err) {
+      console.error('Lỗi nạp danh mục:', err);
     }
   }
 
+  // 2. Tra cứu tìm kiếm trực tiếp trên Database
+  async function loadKhachHang(searchKeyword = tuKhoa) {
+    setLoading(true);
+    try {
+      // Đếm tổng số khách thực tế trong toàn bộ database (không kéo dữ liệu nặng)
+      const { count } = await supabase
+        .from('dich_vu_khach_hang')
+        .select('*', { count: 'exact', head: true });
+      if (count !== null) setTongSoKhach(count);
+
+      let query = supabase.from('dich_vu_khach_hang').select('*');
+
+      const k = searchKeyword.trim();
+      if (k) {
+        // Tìm kiếm toàn diện trên 1.582+ bản ghi
+        query = query.or(
+          `bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%`
+        ).limit(100);
+      } else {
+        // Khi không tìm kiếm, chỉ lấy 50 khách hàng gần nhất
+        query = query.order('id', { ascending: false }).limit(50);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setDanhSach(data || []);
+    } catch (err: any) {
+      console.error('Lỗi tải khách hàng:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Tự động tìm kiếm sau khi người dùng dừng gõ 300ms (Debounce)
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => {
+      loadKhachHang(tuKhoa);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [tuKhoa]);
+
+  useEffect(() => {
     loadDanhMuc();
   }, []);
 
@@ -172,7 +139,7 @@ export default function KhachHangHenPage() {
     setModalOpen(true);
   }
 
-  // 5. Lưu dữ liệu (Thêm hoặc Cập nhật)
+  // 5. Lưu dữ liệu (Thêm mới hoặc Cập nhật)
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const bsChuan = formData.bien_so.trim().toUpperCase();
@@ -197,20 +164,18 @@ export default function KhachHangHenPage() {
           .from('dich_vu_khach_hang')
           .update(payload)
           .eq('bien_so', bsChuan);
-
         if (error) throw error;
         alert(`Đã cập nhật thông tin xe ${bsChuan}!`);
       } else {
         const { error } = await supabase
           .from('dich_vu_khach_hang')
           .insert([payload]);
-
         if (error) throw error;
         alert(`Đã thêm mới lịch hẹn xe ${bsChuan}!`);
       }
 
       setModalOpen(false);
-      loadData();
+      loadKhachHang();
     } catch (err: any) {
       alert('Lỗi lưu dữ liệu: ' + (err.message || JSON.stringify(err)));
     } finally {
@@ -218,11 +183,9 @@ export default function KhachHangHenPage() {
     }
   }
 
-  // 6. Xóa theo biển số (Khóa chính)
+  // 6. Xóa theo biển số
   async function handleDelete(item: KhachHangItem) {
-    if (!confirm(`Bạn có chắc chắn muốn xóa khách hẹn xe biển số "${item.bien_so}"?`)) {
-      return;
-    }
+    if (!confirm(`Bạn có chắc chắn muốn xóa khách hẹn xe biển số "${item.bien_so}"?`)) return;
 
     try {
       const { error } = await supabase
@@ -231,25 +194,13 @@ export default function KhachHangHenPage() {
         .eq('bien_so', item.bien_so);
 
       if (error) throw error;
-
       setDanhSach((prev) => prev.filter((x) => x.bien_so !== item.bien_so));
+      setTongSoKhach((prev) => Math.max(0, prev - 1));
       alert(`Đã xóa thành công xe ${item.bien_so}!`);
     } catch (err: any) {
       alert('Lỗi xóa khách hàng: ' + err.message);
     }
   }
-
-  // Lọc tìm kiếm
-  const ketQuaLoc = danhSach.filter((kh) => {
-    if (!tuKhoa.trim()) return true;
-    const q = tuKhoa.toLowerCase().trim();
-    return (
-      kh.bien_so?.toLowerCase().includes(q) ||
-      kh.ten_khach_hang?.toLowerCase().includes(q) ||
-      kh.so_dien_thoai?.includes(q) ||
-      kh.co_van?.toLowerCase().includes(q)
-    );
-  });
 
   return (
     <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
@@ -263,7 +214,7 @@ export default function KhachHangHenPage() {
               DANH SÁCH KHÁCH HÀNG HẸN
             </h1>
             <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '12px' }}>
-              {danhSach.length} khách
+              {tuKhoa ? `Tìm thấy ${danhSach.length} khách` : `Tổng: ${tongSoKhach || danhSach.length} khách`}
             </span>
           </div>
 
@@ -279,7 +230,7 @@ export default function KhachHangHenPage() {
                 borderRadius: '6px',
                 fontSize: '12px',
                 outline: 'none',
-                width: '240px',
+                width: '260px',
               }}
             />
 
@@ -307,7 +258,7 @@ export default function KhachHangHenPage() {
 
             <button
               type="button"
-              onClick={loadData}
+              onClick={() => loadKhachHang()}
               title="Làm mới bảng"
               style={{
                 backgroundColor: '#fff',
@@ -327,7 +278,7 @@ export default function KhachHangHenPage() {
 
         {/* BẢNG DỮ LIỆU */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Đang nạp danh sách khách hàng...</div>
+          <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Đang tìm kiếm...</div>
         ) : (
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
@@ -343,14 +294,14 @@ export default function KhachHangHenPage() {
                 </tr>
               </thead>
               <tbody>
-                {ketQuaLoc.length === 0 ? (
+                {danhSach.length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                      Không tìm thấy bản ghi nào phù hợp.
+                      Không tìm thấy khách hàng nào khớp với từ khóa "{tuKhoa}".
                     </td>
                   </tr>
                 ) : (
-                  ketQuaLoc.map((kh) => (
+                  danhSach.map((kh) => (
                     <tr key={kh.bien_so} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#0284c7' }}>
                         {kh.bien_so}
@@ -432,7 +383,7 @@ export default function KhachHangHenPage() {
         )}
       </div>
 
-      {/* MODAL THÊM / SỬA KHÁCH HÀNG HẸN */}
+      {/* MODAL THÊM / SỬA KHÁCH HÀNG */}
       {modalOpen && (
         <div
           style={{
@@ -457,7 +408,6 @@ export default function KhachHangHenPage() {
               overflow: 'hidden',
             }}
           >
-            {/* Modal Header */}
             <div
               style={{
                 padding: '16px 20px',
@@ -480,12 +430,11 @@ export default function KhachHangHenPage() {
               </button>
             </div>
 
-            {/* Modal Form */}
             <form onSubmit={handleSave} style={{ padding: '20px' }}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>
                   Biển số xe <span style={{ color: '#ef4444' }}>*</span>
-                  {isEditing && <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal', marginLeft: '6px' }}>(Khóa chính - Không được sửa)</span>}
+                  {isEditing && <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal', marginLeft: '6px' }}>(Khóa chính)</span>}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -515,9 +464,7 @@ export default function KhachHangHenPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
-                  <label style={labelStyle}>
-                    Tên khách hàng <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
+                  <label style={labelStyle}>Tên khách hàng <span style={{ color: '#ef4444' }}>*</span></label>
                   <input
                     type="text"
                     placeholder="VD: Anh Tuấn"
@@ -540,7 +487,6 @@ export default function KhachHangHenPage() {
                 </div>
               </div>
 
-              {/* Hạng mục & Trạng thái hẹn */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Hạng mục dự kiến</label>
@@ -573,7 +519,6 @@ export default function KhachHangHenPage() {
                 </div>
               </div>
 
-              {/* Cố vấn viên phụ trách */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={labelStyle}>Cố vấn viên phụ trách (CVDV)</label>
                 <select
@@ -590,7 +535,6 @@ export default function KhachHangHenPage() {
                 </select>
               </div>
 
-              {/* Nút hành động modal */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="button"
@@ -637,7 +581,7 @@ export default function KhachHangHenPage() {
 const labelStyle = {
   display: 'block',
   fontSize: '12px',
-  fontWeight: '600',
+  fontWeight: '600' as const,
   color: '#334155',
   marginBottom: '5px',
 };
