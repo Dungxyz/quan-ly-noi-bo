@@ -9,6 +9,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { currentUser, kiemTraQuyen, dangXuat } = useAuth();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+  const [openDichVu, setOpenDichVu] = useState(true); // Trạng thái mở/đóng submenu Dịch vụ
 
   const menuItems = [
     {
@@ -17,7 +18,7 @@ export default function Sidebar() {
       path: '/ho-so',
       moduleKey: 'HO_SO',
       moTa: 'Tài khoản hệ thống & thông tin',
-      isPublic: true, // Mục chung dành cho mọi nhân sự có tài khoản
+      isPublic: true,
     },
     {
       title: 'Quản lý Nhân sự',
@@ -47,28 +48,26 @@ export default function Sidebar() {
       moduleKey: 'DAT_HOA',
       moTa: 'Hoa bàn giao xe & duyệt chi',
     },
+  ];
 
-    // Mục Dịch Vụ Đại Lý mới dán vào
+  const dichVuChildren = [
     {
-      title: 'Dịch Vụ Đại Lý',
-      icon: '🔧',
-      children: [
-        {
-          name: 'Tiếp nhận xe',
-          path: '/dich-vu/tiep-nhan',
-          icon: '🚗',
-        },
-        {
-          name: 'Khách hàng hẹn',
-          path: '/dich-vu/khach-hang',
-          icon: '📅',
-        },
-        {
-          name: 'Báo cáo dịch vụ',
-          path: '/dich-vu/bao-cao',
-          icon: '📊',
-        },
-      ],
+      name: 'Tiếp nhận xe',
+      path: '/dich-vu/tiep-nhan',
+      icon: '🚗',
+      moduleKey: 'TN_VIEW',
+    },
+    {
+      name: 'Khách hàng hẹn',
+      path: '/dich-vu/khach-hang',
+      icon: '📅',
+      moduleKey: 'HEN_VIEW',
+    },
+    {
+      name: 'Báo cáo dịch vụ',
+      path: '/dich-vu/bao-cao',
+      icon: '📊',
+      moduleKey: 'TN_VIEW',
     },
   ];
 
@@ -76,6 +75,19 @@ export default function Sidebar() {
     setShowConfirmLogout(false);
     dangXuat();
   }
+
+  // Kiểm tra quyền truy cập một module
+  function checkQuyen(key, isPublic) {
+    if (isPublic) return true;
+    if (!currentUser) return false;
+    const role = currentUser.phan_quyen || '';
+    if (role === 'ADMIN' || role === 'ALL') return true;
+    if (role.includes(key)) return true;
+    if (typeof kiemTraQuyen === 'function' && kiemTraQuyen(key)) return true;
+    return false;
+  }
+
+  const isDichVuActive = dichVuChildren.some((child) => pathname === child.path);
 
   return (
     <>
@@ -91,6 +103,7 @@ export default function Sidebar() {
           top: 0,
           flexShrink: 0,
           borderRight: '1px solid #1e293b',
+          userSelect: 'none',
         }}
       >
         {/* Brand Header */}
@@ -149,7 +162,7 @@ export default function Sidebar() {
                 </span>
               </div>
 
-              {/* Nút bấm mở xác nhận Đăng xuất */}
+              {/* Nút Đăng xuất */}
               <button
                 type="button"
                 onClick={() => setShowConfirmLogout(true)}
@@ -180,14 +193,14 @@ export default function Sidebar() {
           )}
         </div>
 
-        {/* Danh mục menu */}
-        <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {/* Danh mục menu chính */}
+        <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
           <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', padding: '0 8px 6px 8px' }}>
             Phân hệ chức năng
           </div>
 
           {menuItems.map((item) => {
-            const duocPhep = item.isPublic || (typeof kiemTraQuyen === 'function' ? kiemTraQuyen(item.moduleKey) : false);
+            const duocPhep = checkQuyen(item.moduleKey, item.isPublic);
             const dangChon = pathname === item.path;
 
             if (!duocPhep) {
@@ -239,6 +252,66 @@ export default function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Cụm menu: DỊCH VỤ ĐẠI LÝ */}
+          <div style={{ marginTop: '8px' }}>
+            <div
+              onClick={() => setOpenDichVu(!openDichVu)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                color: isDichVuActive ? '#38bdf8' : '#cbd5e1',
+                backgroundColor: isDichVuActive ? 'rgba(2, 132, 199, 0.15)' : 'transparent',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '18px' }}>🔧</span>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold' }}>Dịch Vụ Đại Lý</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>Tiếp nhận & Báo cáo</div>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', color: '#64748b' }}>{openDichVu ? '▼' : '▶'}</span>
+            </div>
+
+            {/* Danh mục con của Dịch Vụ */}
+            {openDichVu && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingLeft: '28px' }}>
+                {dichVuChildren.map((sub) => {
+                  const subDuocPhep = checkQuyen(sub.moduleKey, false);
+                  const subDangChon = pathname === sub.path;
+
+                  if (!subDuocPhep) return null;
+
+                  return (
+                    <Link
+                      key={sub.path}
+                      href={sub.path}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        color: subDangChon ? '#fff' : '#94a3b8',
+                        backgroundColor: subDangChon ? '#0284c7' : 'transparent',
+                        textDecoration: 'none',
+                        fontSize: '12px',
+                        fontWeight: subDangChon ? 'bold' : 'normal',
+                      }}
+                    >
+                      <span>{sub.icon}</span>
+                      <span>{sub.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
 
         <div style={{ padding: '16px', borderTop: '1px solid #1e293b', fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
