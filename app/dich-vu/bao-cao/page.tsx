@@ -134,6 +134,107 @@ export default function BaoCaoDichVuPage() {
     link.click();
     document.body.removeChild(link);
   }
+ 
+  // Hàm xuất Báo Cáo Ngày đúng mẫu Excel đại lý
+  function handleXuatBaoCaoNgayMau() {
+    if (duLieuBaoCao.length === 0) {
+      alert('Không có dữ liệu trong khoảng thời gian đã chọn để xuất báo cáo!');
+      return;
+    }
+
+    // Format ngày DD/MM/YYYY
+    const dParts = tuNgay.split('-');
+    const ngayHienThi = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : tuNgay;
+    const tongSoXe = duLieuBaoCao.length;
+
+    // Tạo các dòng dữ liệu với đúng style màu sắc & căn lề
+    const tableRows = duLieuBaoCao.map((r) => {
+      // Tách mã nhân viên để lấy tên Cố vấn (VD: "FNV-160 Thiều Minh Tài" -> "Thiều Minh Tài")
+      let tenCoVanRaw = r.co_van_vien || r.ten_co_van || '';
+      const parts = tenCoVanRaw.trim().split(' ');
+      if (parts.length > 1 && parts[0].toUpperCase().startsWith('FNV')) {
+        tenCoVanRaw = parts.slice(1).join(' ');
+      }
+
+      const hangMucVal = r.hang_muc_thuc_hien || r.hang_muc || '';
+      const trangThaiVal = r.trang_thai_hen || r.trang_thai || '24H';
+
+      return `
+        <tr>
+          <td style="border: 1px solid #000; text-align: center; mso-number-format:'\\@';">1</td>
+          <td style="border: 1px solid #000; text-align: center; font-weight: bold; mso-number-format:'\\@';">${r.bien_so || ''}</td>
+          <td style="border: 1px solid #000; text-align: left;">${r.ten_khach_hang || ''}</td>
+          <td style="border: 1px solid #000; text-align: left; color: #dc2626; font-weight: 500;">${tenCoVanRaw}</td>
+          <td style="border: 1px solid #000; text-align: center; color: #0284c7; font-weight: 500;">${hangMucVal}</td>
+          <td style="border: 1px solid #000; text-align: center;">${trangThaiVal}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Khung HTML chuẩn Excel (XML/HTML Table)
+    const excelTemplate = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>BC_NGAY</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          td, th { font-family: 'Times New Roman', Arial, sans-serif; font-size: 11pt; vertical-align: middle; }
+        </style>
+      </head>
+      <body>
+        <table style="border-collapse: collapse; width: 100%;">
+          <!-- Dòng 1: BÁO CÁO NGÀY -->
+          <tr>
+            <td colspan="3" style="text-align: right; font-weight: bold; font-size: 13pt;">BÁO CÁO NGÀY:</td>
+            <td colspan="3" style="text-align: left; font-weight: bold; font-size: 13pt; color: #dc2626;">${ngayHienThi}</td>
+          </tr>
+          <!-- Dòng 2: TỔNG SỐ XE THỰC HIỆN TRONG NGÀY -->
+          <tr>
+            <td colspan="3" style="text-align: right; font-weight: bold; font-size: 12pt;">TỔNG SỐ XE THỰC HIỆN TRONG NGÀY:</td>
+            <td colspan="3" style="text-align: left; font-weight: bold; font-size: 12pt; color: #dc2626;">${tongSoXe}</td>
+          </tr>
+          <tr><td colspan="6" style="height: 10px;"></td></tr>
+          
+          <!-- Dòng Header bảng -->
+          <tr style="background-color: #FCD5B4; height: 35px;">
+            <th style="border: 1px solid #000; width: 50px; text-align: center; font-weight: bold;">STT</th>
+            <th style="border: 1px solid #000; width: 130px; text-align: center; font-weight: bold;">BIỂN SỐ</th>
+            <th style="border: 1px solid #000; width: 220px; text-align: center; font-weight: bold;">TÊN<br/>KHÁCH HÀNG</th>
+            <th style="border: 1px solid #000; width: 180px; text-align: center; font-weight: bold;">TÊN<br/>CỐ VẤN</th>
+            <th style="border: 1px solid #000; width: 180px; text-align: center; font-weight: bold;">HẠNG MỤC<br/>THỰC HIỆN</th>
+            <th style="border: 1px solid #000; width: 130px; text-align: center; font-weight: bold;">TRẠNG THÁI<br/>HẸN</th>
+          </tr>
+
+          <!-- Dữ liệu -->
+          ${tableRows}
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\uFEFF' + excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Bao_Cao_Ngay_${ngayHienThi.replace(/\//g, '-')}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
@@ -245,6 +346,26 @@ export default function BaoCaoDichVuPage() {
             }}
           >
             <span>📗</span> Xuất Excel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleXuatBaoCaoNgayMau}
+            style={{
+              backgroundColor: '#eab308',
+              color: '#000',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>📑</span> BC Ngày (Mẫu)
           </button>
         </div>
 
