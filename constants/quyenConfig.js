@@ -25,6 +25,9 @@ export const DANH_MUC_QUYEN = [
     danhSach: [
       { id: 'DEMO_VIEW', label: 'Xem xe demo' },
       { id: 'DEMO_HISTORY', label: 'Xem lịch sử xe' },
+      { id: 'DEMO_EDIT', label: 'Chỉnh sửa' },
+      { id: 'DEMO_DELETE', label: 'Xóa' },
+      { id: 'DEMO_CREATE', label: 'Thêm' },
     ],
   },
   {
@@ -58,10 +61,10 @@ export function layBadgeQuyen(phanQuyenStr) {
 
   const dsQuyen = phanQuyenStr.split(',').map((x) => x.trim());
 
-  // Kiểm tra quyền Xe demo
+  // Kiểm tra quyền Xe demo (cập nhật hiển thị theo tối đa 5 quyền)
   const quyenDemo = dsQuyen.filter((x) => x.startsWith('DEMO_'));
   if (quyenDemo.length > 0) {
-    return { text: `Xe Demo (${quyenDemo.length}/2)`, bg: '#fef9c3', color: '#a16207' };
+    return { text: `Xe Demo (${quyenDemo.length}/5)`, bg: '#fef9c3', color: '#a16207' };
   }
 
   return { text: `Đã cấp (${dsQuyen.length} mục)`, bg: '#dcfce7', color: '#15803d' };
