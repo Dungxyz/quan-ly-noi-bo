@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function BaoCaoDichVuPage() {export default function BaoCaoDichVuPage() {
+export default function BaoCaoDichVuPage() {
   const [tuNgay, setTuNgay] = useState('');
   const [denNgay, setDenNgay] = useState('');
   const [coVan, setCoVan] = useState('');
@@ -14,21 +14,27 @@ export default function BaoCaoDichVuPage() {export default function BaoCaoDichVu
   const [duLieuBaoCao, setDuLieuBaoCao] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 1. Khởi tạo ngày hiện tại và nạp danh mục ở Client
-  useEffect(() => {
-    const homNay = new Date().toISOString().split('T')[0];
-    setTuNgay(homNay);
-    setDenNgay(homNay);
-    loadDanhMucLoc();
-  }, []);
+  // 1. Tải danh mục Cố vấn (CVDV) và Hạng mục dịch vụ
+  async function loadDanhMucLoc() {
+    try {
+      // Lấy danh sách cố vấn thuộc bộ phận CVDV
+      const { data: nvData } = await supabase
+        .from('nhan_vien')
+        .select('ma_nv, ho_ten, bo_phan, vi_tri')
+        .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
+        .order('ma_nv', { ascending: true });
 
-  // 2. Tự động lọc dữ liệu khi ngày bắt đầu và kết thúc đã được gán
-  useEffect(() => {
-    if (tuNgay && denNgay) {
-      handleLoc();
-    }
-  }, [tuNgay, denNgay]);
-      // Nạp danh mục Hạng mục từ bảng cấu hình
+      if (nvData && nvData.length > 0) {
+        setDanhSachCoVan(nvData);
+      } else {
+        const { data: allNv } = await supabase
+          .from('nhan_vien')
+          .select('ma_nv, ho_ten')
+          .order('ma_nv', { ascending: true });
+        if (allNv) setDanhSachCoVan(allNv);
+      }
+
+      // Lấy danh mục hạng mục dịch vụ
       const { data: hmData } = await supabase
         .from('cau_hinh_hang_muc')
         .select('*')
@@ -53,17 +59,20 @@ export default function BaoCaoDichVuPage() {export default function BaoCaoDichVu
   }
 
   // 2. Hàm lọc dữ liệu báo cáo
-  async function handleLoc() {
+  async function handleLoc(tuNgayVal = tuNgay, denNgayVal = denNgay) {
+    const startDate = tuNgayVal || tuNgay;
+    const endDate = denNgayVal || denNgay;
+    if (!startDate || !endDate) return;
+
     setLoading(true);
     try {
       let query = supabase
         .from('dich_vu_tiep_nhan')
         .select('*')
-        .gte('thoi_gian', `${tuNgay}T00:00:00+07:00`)
-        .lte('thoi_gian', `${denNgay}T23:59:59+07:00`);
+        .gte('thoi_gian', `${startDate}T00:00:00+07:00`)
+        .lte('thoi_gian', `${endDate}T23:59:59+07:00`);
 
       if (coVan) {
-        // Tìm kiếm tương đối theo tên hoặc mã cố vấn
         query = query.or(`co_van_vien.ilike.%${coVan}%,ten_co_van.ilike.%${coVan}%,ma_co_van.ilike.%${coVan}%`);
       }
 
@@ -81,12 +90,16 @@ export default function BaoCaoDichVuPage() {export default function BaoCaoDichVu
     }
   }
 
+  // 3. Khởi tạo ngày hiện tại và chạy lọc lần đầu ở Client
   useEffect(() => {
+    const homNay = new Date().toISOString().split('T')[0];
+    setTuNgay(homNay);
+    setDenNgay(homNay);
     loadDanhMucLoc();
-    handleLoc();
+    handleLoc(homNay, homNay);
   }, []);
 
-  // 3. Xuất file Excel (CSV tiếng Việt UTF-8 BOM)
+  // 4. Xuất file Excel (CSV UTF-8 BOM)
   function handleXuatExcel() {
     if (duLieuBaoCao.length === 0) return alert('Không có dữ liệu để xuất!');
     
@@ -106,7 +119,7 @@ export default function BaoCaoDichVuPage() {export default function BaoCaoDichVu
         `"${tenCV}"`,
         `"${hm}"`,
         `"${tt}"`,
-        `\t${sdt}`, // Thêm tab để Excel không biến số 0 đầu thành số
+        `\t${sdt}`,
         `"${gc}"`,
       ];
     });
@@ -195,7 +208,7 @@ export default function BaoCaoDichVuPage() {export default function BaoCaoDichVu
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           <button
             type="button"
-            onClick={handleLoc}
+            onClick={() => handleLoc()}
             disabled={loading}
             style={{
               backgroundColor: '#0284c7',
