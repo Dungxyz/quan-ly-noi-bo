@@ -2,8 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function BaoCaoDichVuPage() {
+  const { currentUser, kiemTraQuyen } = useAuth();
+
+  // Kiểm tra quyền truy cập phân hệ Báo cáo dịch vụ
+  const role = currentUser?.phan_quyen || '';
+  const isAdmin = role === 'ADMIN' || role === 'ALL';
+  const canView = isAdmin || role.includes('BC_VIEW') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('BC_VIEW'));
+  const canExcel = isAdmin || role.includes('BC_EXCEL') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('BC_EXCEL'));
+  const canMau = isAdmin || role.includes('BC_MAU') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('BC_MAU'));
+
   const [tuNgay, setTuNgay] = useState('');
   const [denNgay, setDenNgay] = useState('');
   const [coVan, setCoVan] = useState('');
@@ -80,7 +90,6 @@ export default function BaoCaoDichVuPage() {
 
   // Lọc tức thì theo Cố vấn & Hạng mục ngay trên Client
   const duLieuHienThi = duLieuBaoCao.filter((r) => {
-    // Lọc theo Cố vấn
     if (coVan) {
       const tenCVTrongBang = (r.co_van_vien || r.ten_co_van || '').toLowerCase();
       if (!tenCVTrongBang.includes(coVan.toLowerCase())) {
@@ -88,7 +97,6 @@ export default function BaoCaoDichVuPage() {
       }
     }
 
-    // Lọc theo Hạng mục
     if (hangMuc) {
       const hmTrongBang = (r.hang_muc_thuc_hien || r.hang_muc || '').toLowerCase();
       if (hmTrongBang !== hangMuc.toLowerCase()) {
@@ -105,11 +113,17 @@ export default function BaoCaoDichVuPage() {
     setTuNgay(homNay);
     setDenNgay(homNay);
     loadDanhMucLoc();
-    handleLoc(homNay, homNay);
-  }, []);
+    if (canView) {
+      handleLoc(homNay, homNay);
+    }
+  }, [canView]);
 
   // 4. Xuất file Excel CSV thông thường
   function handleXuatExcel() {
+    if (!canExcel) {
+      alert('Tài khoản của bạn không có quyền xuất file Excel!');
+      return;
+    }
     if (duLieuHienThi.length === 0) return alert('Không có dữ liệu để xuất!');
     
     const headers = ['NO', 'Thời Gian', 'Biển Số', 'Khách Hàng', 'Cố Vấn Viên', 'Hạng Mục Thực Hiện', 'Trạng Thái Hẹn', 'Số Điện Thoại', 'Ghi Chú'];
@@ -146,6 +160,10 @@ export default function BaoCaoDichVuPage() {
 
   // 5. Xuất Báo Cáo Ngày đúng mẫu Excel đại lý (STT tự tăng + Font lớn)
   function handleXuatBaoCaoNgayMau() {
+    if (!canMau) {
+      alert('Tài khoản của bạn không có quyền tải Báo cáo ngày (Mẫu)!');
+      return;
+    }
     if (duLieuHienThi.length === 0) {
       alert('Không có dữ liệu trong khoảng thời gian đã chọn để xuất báo cáo!');
       return;
@@ -233,6 +251,23 @@ export default function BaoCaoDichVuPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  // Chặn hiển thị giao diện nếu tài khoản không có quyền BC_VIEW
+  if (!canView) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
+        <div style={{ maxWidth: '420px', margin: '0 auto', backgroundColor: '#fff', padding: '30px', borderRadius: '10px', border: '1px solid #fecaca', boxShadow: '0 4px 6px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔒</div>
+          <h2 style={{ fontSize: '17px', fontWeight: 'bold', color: '#dc2626', margin: '0 0 8px 0' }}>
+            Truy Cập Bị Từ Chối
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.5', margin: 0 }}>
+            Tài khoản của bạn chưa được cấp quyền <strong>Xem Báo cáo dịch vụ (BC_VIEW)</strong>. Vui lòng liên hệ quản trị viên để được phân quyền.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -329,45 +364,51 @@ export default function BaoCaoDichVuPage() {
             <span>🔍</span> {loading ? 'Đang lọc...' : 'Lọc'}
           </button>
 
-          <button
-            type="button"
-            onClick={handleXuatExcel}
-            style={{
-              backgroundColor: '#16a34a',
-              color: '#fff',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <span>📗</span> Xuất Excel
-          </button>
+          {/* Chỉ hiển thị nút Xuất Excel khi có quyền BC_EXCEL */}
+          {canExcel && (
+            <button
+              type="button"
+              onClick={handleXuatExcel}
+              style={{
+                backgroundColor: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>📗</span> Xuất Excel
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={handleXuatBaoCaoNgayMau}
-            style={{
-              backgroundColor: '#eab308',
-              color: '#000',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <span>📑</span> BC Ngày (Mẫu)
-          </button>
+          {/* Chỉ hiển thị nút BC Ngày (Mẫu) khi có quyền BC_MAU */}
+          {canMau && (
+            <button
+              type="button"
+              onClick={handleXuatBaoCaoNgayMau}
+              style={{
+                backgroundColor: '#eab308',
+                color: '#000',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>📑</span> BC Ngày (Mẫu)
+            </button>
+          )}
         </div>
 
         {/* BẢNG DỮ LIỆU BÁO CÁO */}

@@ -2,8 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function TiepNhanXePage() {
+  const { currentUser, kiemTraQuyen } = useAuth();
+
+  // Kiểm tra quyền hạn phân hệ Tiếp nhận xe
+  const role = currentUser?.phan_quyen || '';
+  const isAdmin = role === 'ADMIN' || role === 'ALL';
+  const canView = isAdmin || role.includes('TN_VIEW') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('TN_VIEW'));
+  const canAdd = isAdmin || role.includes('TN_ADD') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('TN_ADD'));
+  const canEdit = isAdmin || role.includes('TN_EDIT') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('TN_EDIT'));
+  const canDelete = isAdmin || role.includes('TN_DELETE') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('TN_DELETE'));
+
   const [nhatKy, setNhatKy] = useState<any[]>([]);
   const [danhSachCoVan, setDanhSachCoVan] = useState<any[]>([]);
   const [dsHangMuc, setDsHangMuc] = useState<any[]>([]);
@@ -30,7 +41,6 @@ export default function TiepNhanXePage() {
   // 1. Tải danh mục cố vấn CVDV, hạng mục, trạng thái và nhật ký gần nhất
   async function loadInitData() {
     try {
-      // Lấy danh sách nhân viên thuộc bộ phận CVDV
       const { data: cvData } = await supabase
         .from('nhan_vien')
         .select('ma_nv, ho_ten, bo_phan, vi_tri')
@@ -47,7 +57,6 @@ export default function TiepNhanXePage() {
         if (allNv) setDanhSachCoVan(allNv);
       }
 
-      // Lấy danh mục hạng mục dịch vụ
       const { data: hmData } = await supabase
         .from('cau_hinh_hang_muc')
         .select('*')
@@ -66,7 +75,6 @@ export default function TiepNhanXePage() {
         ]);
       }
 
-      // Lấy danh mục trạng thái hẹn
       const { data: ttData } = await supabase
         .from('cau_hinh_trang_thai_hen')
         .select('*')
@@ -81,7 +89,6 @@ export default function TiepNhanXePage() {
         ]);
       }
 
-      // Lấy 25 xe vào gần nhất
       const { data: tnData } = await supabase
         .from('dich_vu_tiep_nhan')
         .select('*')
@@ -97,7 +104,7 @@ export default function TiepNhanXePage() {
     loadInitData();
   }, []);
 
-  // 2. Logic tra cứu tự động từ bảng Khách Hàng đổ về Form khi nhập Biển Số
+  // 2. Tra cứu tự động từ danh sách Khách Hàng khi nhập biển số
   async function handleBienSoBlur() {
     const bsNhap = form.bien_so.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (!bsNhap) return;
@@ -130,9 +137,14 @@ export default function TiepNhanXePage() {
     }
   }
 
-  // 3. Lưu lượt tiếp nhận xe & cập nhật danh sách
+  // 3. Lưu lượt tiếp nhận xe
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canAdd) {
+      alert('Tài khoản của bạn không có quyền thêm mới tiếp nhận xe!');
+      return;
+    }
+
     const bs = form.bien_so.trim().toUpperCase();
     if (!bs || !form.ten_khach_hang.trim() || !form.co_van_vien) {
       alert('Vui lòng điền đủ: Biển số, Tên khách hàng và Cố vấn viên!');
@@ -198,12 +210,10 @@ export default function TiepNhanXePage() {
     const rowDateStr = rowTime.toLocaleDateString('vi-VN');
     const nowDateStr = now.toLocaleDateString('vi-VN');
 
-    // Khác ngày -> Khóa
     if (rowDateStr !== nowDateStr) {
       return true;
     }
 
-    // Cùng ngày nhưng hiện tại đã từ 18:00 trở đi -> Khóa
     if (now.getHours() >= 18) {
       return true;
     }
@@ -213,6 +223,10 @@ export default function TiepNhanXePage() {
 
   // 5. Mở modal Sửa
   function handleOpenEdit(row: any) {
+    if (!canEdit) {
+      alert('Tài khoản của bạn không có quyền chỉnh sửa tiếp nhận xe!');
+      return;
+    }
     if (kiemTraBiKhoa(row.thoi_gian)) {
       alert('Lượt tiếp nhận này đã bị khóa (sau 18h00 hoặc đã qua ngày), không thể sửa!');
       return;
@@ -224,7 +238,7 @@ export default function TiepNhanXePage() {
   // 6. Lưu Sửa
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
-    if (!editRow) return;
+    if (!editRow || !canEdit) return;
 
     setSavingEdit(true);
     try {
@@ -253,6 +267,10 @@ export default function TiepNhanXePage() {
 
   // 7. Xóa lượt tiếp nhận
   async function handleDelete(row: any) {
+    if (!canDelete) {
+      alert('Tài khoản của bạn không có quyền xóa lượt tiếp nhận xe!');
+      return;
+    }
     if (kiemTraBiKhoa(row.thoi_gian)) {
       alert('Lượt tiếp nhận này đã bị khóa (sau 18h00 hoặc đã qua ngày), không thể xóa!');
       return;
@@ -274,6 +292,23 @@ export default function TiepNhanXePage() {
     } catch (err: any) {
       alert('Lỗi xóa tiếp nhận: ' + err.message);
     }
+  }
+
+  // Chặn truy cập nếu không có quyền TN_VIEW
+  if (!canView) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
+        <div style={{ maxWidth: '420px', margin: '0 auto', backgroundColor: '#fff', padding: '30px', borderRadius: '10px', border: '1px solid #fecaca', boxShadow: '0 4px 6px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔒</div>
+          <h2 style={{ fontSize: '17px', fontWeight: 'bold', color: '#dc2626', margin: '0 0 8px 0' }}>
+            Truy Cập Bị Từ Chối
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.5', margin: 0 }}>
+            Tài khoản của bạn chưa được cấp quyền <strong>Xem Tiếp nhận xe (TN_VIEW)</strong>. Vui lòng liên hệ quản trị viên để được phân quyền.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -417,23 +452,45 @@ export default function TiepNhanXePage() {
             >
               Nhập lại
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                flex: 1.5,
-                padding: '10px',
-                borderRadius: '6px',
-                border: 'none',
-                background: '#0284c7',
-                color: '#fff',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '13px',
-              }}
-            >
-              {loading ? 'Đang lưu...' : '🚀 Lưu & Gửi Zalo'}
-            </button>
+
+            {/* Chặn nút lưu nếu không có quyền TN_ADD */}
+            {canAdd ? (
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  flex: 1.5,
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#0284c7',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                }}
+              >
+                {loading ? 'Đang lưu...' : '🚀 Lưu & Gửi Zalo'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                style={{
+                  flex: 1.5,
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#f1f5f9',
+                  color: '#94a3b8',
+                  fontWeight: 'bold',
+                  cursor: 'not-allowed',
+                  fontSize: '12px',
+                }}
+              >
+                🔒 Không có quyền lưu
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -515,38 +572,47 @@ export default function TiepNhanXePage() {
                           </span>
                         ) : (
                           <div style={{ display: 'inline-flex', gap: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(row)}
-                              title="Sửa thông tin"
-                              style={{
-                                padding: '3px 7px',
-                                backgroundColor: '#fff',
-                                border: '1px solid #bae6fd',
-                                color: '#0284c7',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                              }}
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(row)}
-                              title="Xóa tiếp nhận"
-                              style={{
-                                padding: '3px 7px',
-                                backgroundColor: '#fff',
-                                border: '1px solid #fecaca',
-                                color: '#dc2626',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                              }}
-                            >
-                              🗑
-                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(row)}
+                                title="Sửa thông tin"
+                                style={{
+                                  padding: '3px 7px',
+                                  backgroundColor: '#fff',
+                                  border: '1px solid #bae6fd',
+                                  color: '#0284c7',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                ✏️
+                              </button>
+                            )}
+
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(row)}
+                                title="Xóa tiếp nhận"
+                                style={{
+                                  padding: '3px 7px',
+                                  backgroundColor: '#fff',
+                                  border: '1px solid #fecaca',
+                                  color: '#dc2626',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                🗑
+                              </button>
+                            )}
+
+                            {!canEdit && !canDelete && (
+                              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Chỉ xem</span>
+                            )}
                           </div>
                         )}
                       </td>
