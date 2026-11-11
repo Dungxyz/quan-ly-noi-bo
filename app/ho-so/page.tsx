@@ -15,7 +15,7 @@ export default function HoSoCaNhanPage() {
 
   const dsTaiKhoan = [
     { label: 'Cyber (Phần mềm DMS)', icon: '🖥️', value: currentUser.cyber },
-    { label: 'AppSheet', icon: '📱', value: currentUser.app_sheet },
+    { label: 'AppSheet', icon: '📱', value: currentUser.appsheet },
     { label: 'SPS ID', icon: '🌐', value: currentUser.sps_id },
     { label: 'Stars ID', icon: '⭐', value: currentUser.stars_id },
     { label: 'Synology Drive', icon: '💾', value: currentUser.synology },
@@ -23,7 +23,7 @@ export default function HoSoCaNhanPage() {
     { label: 'LMS Đào tạo', icon: '🎓', value: currentUser.lms },
     { label: 'Servis2', icon: '🔧', value: currentUser.servis2 },
     { label: 'DSG / Wingspan', icon: '✈️', value: currentUser.wingspan || currentUser.dsg },
-    { label: 'ID Zalo Bot', icon: '💬', value: currentUser.uid_zalo },
+    { label: 'ID Zalo Bot', icon: '💬', value: currentUser.id_doan_chat_bot },
   ];
 
   const tenVietTat = currentUser.ho_ten
