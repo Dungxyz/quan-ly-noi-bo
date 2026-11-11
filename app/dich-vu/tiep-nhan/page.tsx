@@ -43,7 +43,7 @@ export default function TiepNhanXePage() {
     try {
       const { data: cvData } = await supabase
         .from('nhan_vien')
-        .select('ma_nv, ho_ten, bo_phan, vi_tri, id_chat_bot')
+        .select('ma_nv, ho_ten, bo_phan, vi_tri, id_doan_chat_bot')
         .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
         .order('ma_nv', { ascending: true });
 
@@ -52,7 +52,7 @@ export default function TiepNhanXePage() {
       } else {
         const { data: allNv } = await supabase
           .from('nhan_vien')
-          .select('ma_nv, ho_ten, id_chat_bot')
+          .select('ma_nv, ho_ten, id_doan_chat_bot')
           .order('ma_nv', { ascending: true });
         if (allNv) setDanhSachCoVan(allNv);
       }
