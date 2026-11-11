@@ -1,59 +1,51 @@
 export const DANH_MUC_QUYEN = [
-  // 1. Phân hệ Dịch Vụ Đại Lý
   {
-    nhom: 'Dịch Vụ - Tiếp Nhận Xe',
+    nhom: '1. Xe Demo',
+    icon: '🚙',
+    danhSach: [
+      { id: 'DEMO_VIEW', label: 'Xem xe demo' },
+      { id: 'DEMO_HISTORY', label: 'Xem lịch sử xe' },
+      { id: 'DEMO_EDIT', label: 'Chỉnh sửa' },
+      { id: 'DEMO_DELETE', label: 'Xóa' },
+      { id: 'DEMO_CREATE', label: 'Thêm' },
+    ],
+  },
+  {
+    nhom: '2. Đặt hoa bàn giao',
+    icon: '🌸',
+    danhSach: [
+      { id: 'HOA_VIEW', label: 'Xem đơn hoa' },
+      { id: 'HOA_ADD', label: 'Tạo đơn mới' },
+      { id: 'HOA_APPROVE', label: 'Duyệt chi phí' },
+    ],
+  },
+  {
+    nhom: '3.Dịch Vụ - Tiếp Nhận Xe',
     icon: '🚗',
     danhSach: [
       { id: 'TN_VIEW', label: 'Xem trang tiếp nhận' },
-      { id: 'TN_ADD', label: 'Thêm mới (Lưu xe)' },
-      { id: 'TN_EDIT', label: 'Sửa nhật ký' },
+      { id: 'TN_ADD', label: 'Thêm mới (Lưu & Gửi Zalo)' },
+      { id: 'TN_EDIT', label: 'Sửa lượt tiếp nhận' },
       { id: 'TN_DELETE', label: 'Xóa lượt tiếp nhận' },
     ],
   },
   {
-    nhom: 'Dịch Vụ - Khách Hàng Hẹn',
+    nhom: '4. Dịch Vụ - Khách Hàng Hẹn',
     icon: '📅',
     danhSach: [
       { id: 'HEN_VIEW', label: 'Xem danh sách khách hẹn' },
       { id: 'HEN_ADD', label: 'Thêm khách hẹn mới' },
-      { id: 'HEN_EDIT', label: 'Sửa thông tin hẹn' },
-      { id: 'HEN_DELETE', label: 'Xóa lịch hẹn' },
+      { id: 'HEN_EDIT', label: 'Sửa khách hẹn' },
+      { id: 'HEN_DELETE', label: 'Xóa khách hẹn' },
     ],
   },
   {
-    nhom: 'Dịch Vụ - Báo Cáo',
+    nhom: '5. Dịch Vụ - Báo Cáo',
     icon: '📊',
     danhSach: [
-      { id: 'BC_VIEW', label: 'Xem báo cáo & lọc' },
+      { id: 'BC_VIEW', label: 'Xem báo cáo & lọc dữ liệu' },
       { id: 'BC_EXCEL', label: 'Xuất file Excel' },
-      { id: 'BC_MAU', label: 'BC Ngày (Mẫu)' },
-    ],
-  },
-
-  // 2. Các phân hệ khác của đại lý
-  {
-    nhom: 'Xe Demo & Lái Thử',
-    icon: '🚙',
-    danhSach: [
-      { id: 'XE_DEMO', label: 'Xem xe demo' },
-      { id: 'DEMO_ADD', label: 'Đăng ký xuất xe' },
-      { id: 'DEMO_TRA', label: 'Nhận trả xe' },
-    ],
-  },
-  {
-    nhom: 'Quản Lý Đặt Hoa',
-    icon: '🌸',
-    danhSach: [
-      { id: 'DAT_HOA', label: 'Xem danh sách hoa' },
-      { id: 'HOA_ADD', label: 'Tạo đơn đặt hoa' },
-      { id: 'HOA_DUYET', label: 'Duyệt chi đặt hoa' },
-    ],
-  },
-  {
-    nhom: 'Quản Lý Nhân Sự',
-    icon: '👤',
-    danhSach: [
-      { id: 'NHAN_SU', label: 'Quản lý tài khoản & NV' },
+      { id: 'BC_MAU', label: 'Tải Báo cáo ngày' },
     ],
   },
 ];
