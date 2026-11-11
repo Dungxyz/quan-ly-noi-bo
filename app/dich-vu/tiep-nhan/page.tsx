@@ -43,7 +43,7 @@ export default function TiepNhanXePage() {
     try {
       const { data: cvData } = await supabase
         .from('nhan_vien')
-        .select('ma_nv, ho_ten, bo_phan, vi_tri')
+        .select('ma_nv, ho_ten, bo_phan, vi_tri, id_chat_bot')
         .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
         .order('ma_nv', { ascending: true });
 
@@ -52,7 +52,7 @@ export default function TiepNhanXePage() {
       } else {
         const { data: allNv } = await supabase
           .from('nhan_vien')
-          .select('ma_nv, ho_ten')
+          .select('ma_nv, ho_ten, id_chat_bot')
           .order('ma_nv', { ascending: true });
         if (allNv) setDanhSachCoVan(allNv);
       }
@@ -137,7 +137,7 @@ export default function TiepNhanXePage() {
     }
   }
 
-  // 3. Lưu lượt tiếp nhận xe
+  // 3. Lưu lượt tiếp nhận xe & Gửi Zalo Bot
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canAdd) {
@@ -164,12 +164,14 @@ export default function TiepNhanXePage() {
         thoi_gian: new Date().toISOString(),
       };
 
+      // 1. Lưu vào bảng tiếp nhận
       const { error: insertErr } = await supabase
         .from('dich_vu_tiep_nhan')
         .insert([payload]);
 
       if (insertErr) throw insertErr;
 
+      // 2. Cập nhật sang bảng khách hàng
       await supabase.from('dich_vu_khach_hang').upsert(
         {
           bien_so: bs,
@@ -182,6 +184,27 @@ export default function TiepNhanXePage() {
         { onConflict: 'bien_so' }
       );
 
+      // 3. Tìm id_chat_bot của cố vấn được chọn
+      const coVanChon = danhSachCoVan.find((cv) =>
+        form.co_van_vien.includes(cv.ma_nv) || cv.ho_ten === form.co_van_vien
+      );
+      const chatIdCVDV = coVanChon?.id_chat_bot || '';
+
+      // 4. Bắn Zalo Bot qua API Next.js
+      try {
+        await fetch('/api/zalo-bot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            chat_id: chatIdCVDV,
+          }),
+        });
+      } catch (botErr) {
+        console.warn('Lỗi gửi Zalo Bot:', botErr);
+      }
+
+      // 5. Làm mới form
       setForm({
         bien_so: '',
         ten_khach_hang: '',
@@ -192,7 +215,7 @@ export default function TiepNhanXePage() {
         ghi_chu: '',
       });
 
-      alert(`Đã lưu lượt tiếp nhận xe ${bs}!`);
+      alert(`✅ Đã lưu tiếp nhận xe ${bs} và gửi thông báo Zalo Bot thành công!`);
       loadInitData();
     } catch (err: any) {
       alert('Lỗi lưu tiếp nhận: ' + err.message);
