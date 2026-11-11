@@ -56,37 +56,48 @@ export default function BaoCaoDichVuPage() {
     }
   }
 
-  // 2. Hàm lọc dữ liệu báo cáo
-  async function handleLoc(tuNgayVal = tuNgay, denNgayVal = denNgay) {
-    const startDate = tuNgayVal || tuNgay;
-    const endDate = denNgayVal || denNgay;
+  // 2. Tải toàn bộ dữ liệu theo khoảng ngày đã chọn
+  async function handleLoc(startDate = tuNgay, endDate = denNgay) {
     if (!startDate || !endDate) return;
 
     setLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('dich_vu_tiep_nhan')
         .select('*')
         .gte('thoi_gian', `${startDate}T00:00:00+07:00`)
-        .lte('thoi_gian', `${endDate}T23:59:59+07:00`);
+        .lte('thoi_gian', `${endDate}T23:59:59+07:00`)
+        .order('thoi_gian', { ascending: false });
 
-      if (coVan) {
-        query = query.or(`co_van_vien.ilike.%${coVan}%,ten_co_van.ilike.%${coVan}%,ma_co_van.ilike.%${coVan}%`);
-      }
-
-      if (hangMuc) {
-        query = query.or(`hang_muc_thuc_hien.eq.${hangMuc},hang_muc.eq.${hangMuc}`);
-      }
-
-      const { data, error } = await query.order('thoi_gian', { ascending: false });
       if (error) throw error;
       setDuLieuBaoCao(data || []);
     } catch (err: any) {
-      alert('Lỗi lọc dữ liệu: ' + err.message);
+      alert('Lỗi nạp dữ liệu: ' + err.message);
     } finally {
       setLoading(false);
     }
   }
+
+  // Lọc tức thì theo Cố vấn & Hạng mục ngay trên Client
+  const duLieuHienThi = duLieuBaoCao.filter((r) => {
+    // Lọc theo Cố vấn
+    if (coVan) {
+      const tenCVTrongBang = (r.co_van_vien || r.ten_co_van || '').toLowerCase();
+      if (!tenCVTrongBang.includes(coVan.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // Lọc theo Hạng mục
+    if (hangMuc) {
+      const hmTrongBang = (r.hang_muc_thuc_hien || r.hang_muc || '').toLowerCase();
+      if (hmTrongBang !== hangMuc.toLowerCase()) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   // 3. Khởi tạo ngày hiện tại và chạy lọc lần đầu ở Client
   useEffect(() => {
@@ -99,10 +110,10 @@ export default function BaoCaoDichVuPage() {
 
   // 4. Xuất file Excel CSV thông thường
   function handleXuatExcel() {
-    if (duLieuBaoCao.length === 0) return alert('Không có dữ liệu để xuất!');
+    if (duLieuHienThi.length === 0) return alert('Không có dữ liệu để xuất!');
     
     const headers = ['NO', 'Thời Gian', 'Biển Số', 'Khách Hàng', 'Cố Vấn Viên', 'Hạng Mục Thực Hiện', 'Trạng Thái Hẹn', 'Số Điện Thoại', 'Ghi Chú'];
-    const rows = duLieuBaoCao.map((r, idx) => {
+    const rows = duLieuHienThi.map((r, idx) => {
       const tenCV = r.co_van_vien || r.ten_co_van || '';
       const hm = r.hang_muc_thuc_hien || r.hang_muc || '';
       const tt = r.trang_thai_hen || r.trang_thai || '';
@@ -135,16 +146,16 @@ export default function BaoCaoDichVuPage() {
 
   // 5. Xuất Báo Cáo Ngày đúng mẫu Excel đại lý (STT tự tăng + Font lớn)
   function handleXuatBaoCaoNgayMau() {
-    if (duLieuBaoCao.length === 0) {
+    if (duLieuHienThi.length === 0) {
       alert('Không có dữ liệu trong khoảng thời gian đã chọn để xuất báo cáo!');
       return;
     }
 
     const dParts = tuNgay.split('-');
     const ngayHienThi = dParts.length === 3 ? `${dParts[2]}/${dParts[1]}/${dParts[0]}` : tuNgay;
-    const tongSoXe = duLieuBaoCao.length;
+    const tongSoXe = duLieuHienThi.length;
 
-    const tableRows = duLieuBaoCao.map((r, idx) => {
+    const tableRows = duLieuHienThi.map((r, idx) => {
       let tenCoVanRaw = r.co_van_vien || r.ten_co_van || '';
       const parts = tenCoVanRaw.trim().split(' ');
       if (parts.length > 1 && parts[0].toUpperCase().startsWith('FNV')) {
@@ -234,7 +245,7 @@ export default function BaoCaoDichVuPage() {
             <span>📍</span> TRÍCH XUẤT BÁO CÁO DỊCH VỤ
           </h2>
           <span style={{ backgroundColor: '#0f172a', color: '#fff', fontSize: '11px', fontWeight: 'bold', padding: '4px 12px', borderRadius: '12px' }}>
-            Kết quả lọc: {duLieuBaoCao.length} xe
+            Kết quả lọc: {duLieuHienThi.length} xe
           </span>
         </div>
 
@@ -260,6 +271,7 @@ export default function BaoCaoDichVuPage() {
             />
           </div>
 
+          {/* Cố vấn viên */}
           <div>
             <label style={labelStyle}>Cố vấn viên</label>
             <select
@@ -276,6 +288,7 @@ export default function BaoCaoDichVuPage() {
             </select>
           </div>
 
+          {/* Hạng mục */}
           <div>
             <label style={labelStyle}>Hạng mục</label>
             <select
@@ -381,7 +394,7 @@ export default function BaoCaoDichVuPage() {
                   </td>
                 </tr>
               ) : (
-                duLieuBaoCao.map((r, index) => {
+                duLieuHienThi.map((r, index) => {
                   const coVanHienThi = r.co_van_vien || r.ten_co_van || '---';
                   const hangMucHienThi = r.hang_muc_thuc_hien || r.hang_muc || '---';
                   const trangThaiHienThi = r.trang_thai_hen || r.trang_thai || '24H';
