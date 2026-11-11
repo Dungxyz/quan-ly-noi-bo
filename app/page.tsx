@@ -16,6 +16,45 @@ import Toast from '@/components/common/Toast';
 import FormNhanSu from '@/components/nhan-su/FormNhanSu';
 import BangNhanSu from '@/components/nhan-su/BangNhanSu';
 
+// Hàm chuẩn hóa ngày sinh về định dạng YYYY-MM-DD cho input HTML5 type="date"
+function chuanHoaNgayChoInput(dateVal: any): string {
+  if (!dateVal) return '';
+
+  if (typeof dateVal === 'string') {
+    const val = dateVal.trim();
+    // Nếu có chứa giờ ISO (VD: 1999-03-24T00:00:00)
+    if (val.includes('T')) {
+      return val.split('T')[0];
+    }
+    // Nếu trong DB lưu định dạng DD/MM/YYYY (VD: 24/03/1999)
+    if (val.includes('/')) {
+      const parts = val.split('/');
+      if (parts.length === 3) {
+        const d = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
+        const y = parts[2];
+        return `${y}-${m}-${d}`;
+      }
+    }
+    // Nếu đã đúng định dạng YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      return val;
+    }
+  }
+
+  // Trường hợp kiểu Date
+  try {
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+}
+
 export default function NhanSuPage() {
   const authContext = useAuth();
   const currentUser = authContext?.currentUser || null;
@@ -126,9 +165,15 @@ export default function NhanSuPage() {
 
   function handleEdit(nv: any) {
     if (!nv) return;
-    const duLieuChuan = Object.fromEntries(
+    const duLieuChuan: any = Object.fromEntries(
       Object.entries(nv).map(([key, val]) => [key, val === null ? '' : val])
     );
+
+    // Chuyển đổi ngày sinh sang đúng định dạng YYYY-MM-DD
+    if (duLieuChuan.ngay_sinh) {
+      duLieuChuan.ngay_sinh = chuanHoaNgayChoInput(duLieuChuan.ngay_sinh);
+    }
+
     setFormData(duLieuChuan as any);
     setDangChinhSua(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -142,14 +187,14 @@ export default function NhanSuPage() {
     }
 
     try {
-      // 1. Cập nhật thẳng vào bảng nhan_vien trên Supabase
+      // 1. Cập nhật vào bảng nhan_vien trên Supabase
       const { error } = await supabase
         .from('nhan_vien')
         .update({ mat_khau: mk })
         .eq('ma_nv', modalPass.nv.ma_nv);
 
       if (error) {
-        // Dự phòng nếu cơ sở dữ liệu dùng cột so_dien_thoai làm mật khẩu
+        // Dự phòng nếu cột lưu mật khẩu là số điện thoại
         const { error: err2 } = await supabase
           .from('nhan_vien')
           .update({ so_dien_thoai: mk })
@@ -157,13 +202,8 @@ export default function NhanSuPage() {
         if (err2) throw err2;
       }
 
-      // 2. Đóng popup
       setModalPass({ open: false, nv: null });
-
-      // 3. Thông báo thành công
       alert(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${mk}`);
-      
-      // 4. Load lại dữ liệu
       loadData();
     } catch (err: any) {
       alert('Lỗi cập nhật: ' + (err?.message || JSON.stringify(err)));
