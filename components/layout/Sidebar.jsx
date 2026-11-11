@@ -48,6 +48,7 @@ export default function Sidebar() {
       moTa: 'Hoa bàn giao xe & duyệt chi',
     },
 
+    // Mục Dịch Vụ Đại Lý mới dán vào
     {
       title: 'Dịch Vụ Đại Lý',
       icon: '🔧',
@@ -56,25 +57,19 @@ export default function Sidebar() {
           name: 'Tiếp nhận xe',
           path: '/dich-vu/tiep-nhan',
           icon: '🚗',
-          desc: 'Nhập lượt xe vào & nhật ký xưởng',
-          quyenKey: 'TN_VIEW',
         },
         {
           name: 'Khách hàng hẹn',
           path: '/dich-vu/khach-hang',
           icon: '📅',
-          desc: 'Lịch hẹn & danh bạ xe vào xưởng',
-          quyenKey: 'HEN_VIEW',
         },
         {
           name: 'Báo cáo dịch vụ',
           path: '/dich-vu/bao-cao',
           icon: '📊',
-          desc: 'Trích xuất dữ liệu & xuất Excel',
-          quyenKey: 'TN_VIEW',
         },
-      ];
-    }
+      ],
+    },
   ];
 
   function handleXacNhanDangXuat() {
