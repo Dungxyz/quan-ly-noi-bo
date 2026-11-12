@@ -146,8 +146,9 @@ export default function BangNhanSu({
                           {typeof onDoiMatKhau === 'function' && (
                             <button
                               type="button"
-                              onClick={() => onDoiMatKhau(nv)}
-                              title="Đổi/Cấp lại mật khẩu"
+                              disabled={nv.phan_quyen === 'LOCKED'}
+                                onClick={() => onDoiMatKhau(nv)}
+                                title={nv.phan_quyen === 'LOCKED' ? 'Tài khoản đang khóa' : 'Đổi mật khẩu'}
                               style={{
                                 padding: '4px 6px',
                                 border: '1px solid #fed7aa',

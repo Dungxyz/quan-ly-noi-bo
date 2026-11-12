@@ -376,7 +376,16 @@ export default function NhanSuPage() {
           onToggleKhoa={handleToggleKhoa}
           onDelete={handleDelete}
           onNotifyZalo={(nv: any) => baoTin(`Gửi Zalo đến ${nv?.ho_ten || ''} (${nv?.uid_zalo || 'Chưa có UID'})`)}
-          onDoiMatKhau={isAdmin ? (nv: any) => { setModalPass({ open: true, nv }); setNewPassword('123456'); } : null}
+          onDoiMatKhau={isAdmin
+    ? (nv: any) => {
+        if (nv?.phan_quyen === 'LOCKED' || nv?.trang_thai === 'LOCKED') {
+          baoTin(`Tài khoản ${nv.ho_ten} (${nv.ma_nv}) đang bị khóa, không thể đổi mật khẩu!`, 'warning');
+          return;
+        }
+        setModalPass({ open: true, nv });
+        setNewPassword('123456');
+      }
+    : null}
         />
       </div>
 
