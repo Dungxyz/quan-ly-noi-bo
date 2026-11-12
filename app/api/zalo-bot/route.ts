@@ -108,6 +108,83 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, data });
     }
 
+    //4. NHÁNH GỬI THÔNG BÁO ĐẶT HOA GIAO XE (TẠO ĐƠN MỚI & DUYỆT ĐƠN)
+    // =========================================================================
+    if (body.type === 'DAT_HOA') {
+      const {
+        hanh_dong, // 'TAO_MOI' | 'DUYET_DON' | 'TU_CHOI'
+        tu_van_ban_hang,
+        phong_kinh_doanh,
+        ten_khach_hang,
+        hop_dong_so,
+        so_vin_bien_so,
+        ngay_gio_giao_xe,
+        ghi_chu,
+        dat_sau_16h30,
+        hinh_anh_url,
+        nguoi_duyet,
+        ly_do_tu_choi,
+        chat_id_pgd, // UID Zalo Bot của Phó GĐ Kinh Doanh phụ trách phòng đó
+      } = body;
+
+      let noiDungHoa = '';
+
+      if (hanh_dong === 'TAO_MOI') {
+        const canhBaoTre = dat_sau_16h30
+          ? `\n🚨 <b>ĐẶT SAU 16H30 (ĐÃ ĐÍNH KÈM ẢNH XÁC NHẬN)</b>`
+          : '';
+        const dongAnh = hinh_anh_url ? `\n🖼️ Hình ảnh: ${hinh_anh_url}` : '';
+
+        noiDungHoa = `💐 <b>[BÌNH PHƯỚC FORD - YÊU CẦU ĐẶT HOA GIAO XE]</b>
+━━━━━━━━━━━━━━━━━━━━
+🏢 Bộ phận: <b>${phong_kinh_doanh || 'Kinh Doanh'}</b>
+👨‍💼 TVBH: <b>${tu_van_ban_hang}</b>
+👤 Khách hàng: <b>${ten_khach_hang}</b>
+📄 Hợp đồng số: <b>${hop_dong_so}</b>
+🚘 Số VIN / Biển số: ${so_vin_bien_so || '---'}
+⏰ Ngày/giờ giao xe: <b>${ngay_gio_giao_xe}</b>
+📝 Ghi chú: ${ghi_chu || 'Không có'}${canhBaoTre}${dongAnh}
+⏳ Trạng thái: <b>CHỜ PHÓ GĐKD DUYỆT</b>`;
+      } else if (hanh_dong === 'DUYET_DON') {
+        noiDungHoa = `✅ <b>[ĐÃ DUYỆT ĐƠN ĐẶT HOA GIAO XE]</b>
+━━━━━━━━━━━━━━━━━━━━
+👤 Khách hàng: <b>${ten_khach_hang}</b> (HĐ: ${hop_dong_so})
+👨‍💼 TVBH: <b>${tu_van_ban_hang}</b>
+⏰ Giao xe lúc: <b>${ngay_gio_giao_xe}</b>
+✍️ Người duyệt: <b>${nguoi_duyet}</b>`;
+      } else {
+        noiDungHoa = `❌ <b>[TỪ CHỐI ĐƠN ĐẶT HOA]</b>
+━━━━━━━━━━━━━━━━━━━━
+👤 Khách hàng: <b>${ten_khach_hang}</b> (HĐ: ${hop_dong_so})
+👨‍💼 TVBH: <b>${tu_van_ban_hang}</b>
+✍️ Phó GĐKD: <b>${nguoi_duyet}</b>
+⚠️ Lý do: ${ly_do_tu_choi || 'Không đạt điều kiện'}`;
+      }
+
+      // Gửi vào nhóm chung + gửi riêng cho Phó GĐKD của phòng kinh doanh đó
+      const danhSachNhan = new Set<string>([DEFAULT_GROUP_ID]);
+      if (chat_id_pgd && String(chat_id_pgd).trim()) {
+        danhSachNhan.add(String(chat_id_pgd).trim());
+      }
+
+      const ketQua = await Promise.all(
+        Array.from(danhSachNhan).map(async (targetId) => {
+          const res = await fetch(ZALO_BOT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: targetId,
+              text: noiDungHoa,
+              parse_mode: 'HTML',
+            }),
+          });
+          return res.json().catch(() => ({}));
+        })
+      );
+
+      return NextResponse.json({ success: true, ketQua });
+    }
+
     // =========================================================================
     // 3. NHÁNH GỬI THÔNG BÁO TIẾP NHẬN / ĐIỀU CHUYỂN XE DỊCH VỤ
     // =========================================================================
@@ -186,4 +263,7 @@ export async function POST(req: Request) {
     console.error('Lỗi API Zalo Bot:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+
+  
+
 }
