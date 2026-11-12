@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 const ZALO_BOT_URL = 'https://bot-api.zaloplatforms.com/bot2842067600454710958:pqPyfvdqzGuNKTaOhCWadVaLzhWflFoYRFwEigLNALpHrhFKPHqiPdEZlvzoqtmE/sendMessage';
 const DEFAULT_GROUP_ID = '6d6fb4ffc0b229ec70a3';
 
+// Bộ nhớ đệm chống gửi đúp cùng 1 biển số trong vòng 5 giây
+const recentSentCache = new Map<string, number>();
+
 function tachTenCoVan(rawStr: string): string {
   if (!rawStr) return '';
   return rawStr.replace(/^FNV-\d+\s*/i, '').trim();
@@ -22,6 +25,15 @@ export async function POST(req: Request) {
       chat_id,
       co_van_cu,
     } = body;
+
+    // 1. Chống gọi API 2 lần liên tiếp cho cùng 1 xe + cố vấn trong 5 giây
+    const cacheKey = `${bien_so}_${co_van_vien}_${co_van_cu || ''}`;
+    const nowMs = Date.now();
+    const lastSent = recentSentCache.get(cacheKey);
+    if (lastSent && nowMs - lastSent < 5000) {
+      return NextResponse.json({ success: true, skipped: 'Duplicate request blocked' });
+    }
+    recentSentCache.set(cacheKey, nowMs);
 
     // Giờ chuẩn Việt Nam
     const now = new Date();
@@ -54,13 +66,16 @@ export async function POST(req: Request) {
 📝 Ghi chú: ${ghi_chu || 'Không có'}
 ⏰ Thời gian: ${thoiGianStr}`;
 
-    // Gom danh sách người nhận: Luôn có nhóm chung + thêm ID riêng của cố vấn (nếu có)
-    const danhSachNhan = new Set<string>([DEFAULT_GROUP_ID]);
-    if (chat_id && String(chat_id).trim()) {
-      danhSachNhan.add(String(chat_id).trim());
+    // 2. Gom danh sách người nhận & loại bỏ trùng lặp tuyệt đối
+    const cleanGroupId = String(DEFAULT_GROUP_ID).trim();
+    const cleanCvId = chat_id ? String(chat_id).trim() : '';
+
+    const danhSachNhan = new Set<string>([cleanGroupId]);
+    if (cleanCvId && cleanCvId !== cleanGroupId) {
+      danhSachNhan.add(cleanCvId);
     }
 
-    // Gửi đồng thời tới tất cả ID trong danh sách (mỗi ID chỉ gửi 1 lần duy nhất)
+    // 3. Gửi mỗi nơi đúng 1 tin duy nhất
     const ketQua = await Promise.all(
       Array.from(danhSachNhan).map(async (targetId) => {
         const res = await fetch(ZALO_BOT_URL, {
