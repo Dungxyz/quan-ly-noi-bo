@@ -14,6 +14,53 @@ function tachTenCoVan(rawStr: string): string {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
+    // Giờ chuẩn Việt Nam
+    const now = new Date();
+    const vnTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+    const thoiGianStr =
+      vnTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) +
+      ' ' +
+      vnTime.toLocaleDateString('vi-VN');
+
+    // =========================================================================
+    // 1. NHÁNH GỬI THÔNG BÁO CẤP / ĐỔI MẬT KHẨU (GỬI RIÊNG CHO NHÂN VIÊN THEO UID)
+    // =========================================================================
+    if (body.type === 'DOI_MAT_KHAU') {
+      const { ma_nv, ho_ten, mat_khau_moi, chat_id } = body;
+      const cleanUid = chat_id ? String(chat_id).trim() : '';
+
+      if (!cleanUid) {
+        return NextResponse.json({
+          success: false,
+          message: 'Nhân viên chưa có ID Zalo Bot',
+        });
+      }
+
+      const noiDungMatKhau = `🔑 <b>[BÌNH PHƯỚC FORD - CẤP / ĐỔI MẬT KHẨU]</b>
+━━━━━━━━━━━━━━━━━━━━
+👤 Nhân sự: <b>${ho_ten}</b> (${ma_nv})
+🔐 Mật khẩu mới: <b>${mat_khau_moi}</b>
+⏰ Thời gian: ${thoiGianStr}
+⚠️ <i>Vui lòng đăng nhập và bảo mật thông tin tài khoản.</i>`;
+
+      const res = await fetch(ZALO_BOT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: cleanUid,
+          text: noiDungMatKhau,
+          parse_mode: 'HTML',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      return NextResponse.json({ success: true, data });
+    }
+
+    // =========================================================================
+    // 2. NHÁNH GỬI THÔNG BÁO TIẾP NHẬN / ĐIỀU CHUYỂN XE DỊCH VỤ (NHƯ CODE CỦA BẠN)
+    // =========================================================================
     const {
       bien_so,
       ten_khach_hang,
@@ -26,7 +73,7 @@ export async function POST(req: Request) {
       co_van_cu,
     } = body;
 
-    // 1. Chống gọi API 2 lần liên tiếp cho cùng 1 xe + cố vấn trong 5 giây
+    // Chống gọi API 2 lần liên tiếp cho cùng 1 xe + cố vấn trong 5 giây
     const cacheKey = `${bien_so}_${co_van_vien}_${co_van_cu || ''}`;
     const nowMs = Date.now();
     const lastSent = recentSentCache.get(cacheKey);
@@ -34,14 +81,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, skipped: 'Duplicate request blocked' });
     }
     recentSentCache.set(cacheKey, nowMs);
-
-    // Giờ chuẩn Việt Nam
-    const now = new Date();
-    const vnTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-    const thoiGianStr =
-      vnTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) +
-      ' ' +
-      vnTime.toLocaleDateString('vi-VN');
 
     const tenCoVanMoi = tachTenCoVan(co_van_vien);
     const tenCoVanCu = tachTenCoVan(co_van_cu);
@@ -52,7 +91,7 @@ export async function POST(req: Request) {
       : '🚗 <b>[BÌNH PHƯỚC FORD - TIẾP NHẬN XE MỚI]</b>';
 
     const dongDieuChuyen = isDieuChuyen
-      ? `\n🚨 <b>Lưu ý: Điều chuyển từ cố vấn ${tenCoVanCu} sang</b>`
+      ? `\n🚨 <b>Lưu ý: Điều chuyển từ cố vấn ${tenCoVanCu}</b>`
       : '';
 
     const noiDungTinNhan = `${tieuDe}
@@ -66,7 +105,7 @@ export async function POST(req: Request) {
 📝 Ghi chú: ${ghi_chu || 'Không có'}
 ⏰ Thời gian: ${thoiGianStr}`;
 
-    // 2. Gom danh sách người nhận & loại bỏ trùng lặp tuyệt đối
+    // Gom danh sách người nhận & loại bỏ trùng lặp tuyệt đối
     const cleanGroupId = String(DEFAULT_GROUP_ID).trim();
     const cleanCvId = chat_id ? String(chat_id).trim() : '';
 
@@ -75,7 +114,7 @@ export async function POST(req: Request) {
       danhSachNhan.add(cleanCvId);
     }
 
-    // 3. Gửi mỗi nơi đúng 1 tin duy nhất
+    // Gửi mỗi nơi đúng 1 tin duy nhất
     const ketQua = await Promise.all(
       Array.from(danhSachNhan).map(async (targetId) => {
         const res = await fetch(ZALO_BOT_URL, {
