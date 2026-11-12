@@ -186,24 +186,67 @@ export default function NhanSuPage() {
       return;
     }
 
+    const targetNv = modalPass.nv;
+    if (!targetNv) return;
+
     try {
-      // 1. Cập nhật vào bảng nhan_vien trên Supabase
+      // 1. Cập nhật mật khẩu lên Supabase
       const { error } = await supabase
         .from('nhan_vien')
         .update({ mat_khau: mk })
-        .eq('ma_nv', modalPass.nv.ma_nv);
+        .eq('ma_nv', targetNv.ma_nv);
 
       if (error) {
-        // Dự phòng nếu cột lưu mật khẩu là số điện thoại
         const { error: err2 } = await supabase
           .from('nhan_vien')
           .update({ so_dien_thoai: mk })
-          .eq('ma_nv', modalPass.nv.ma_nv);
+          .eq('ma_nv', targetNv.ma_nv);
         if (err2) throw err2;
       }
 
+      // 2. Truy vấn lại chính xác hồ sơ nhân viên từ DB để lấy cột ID Zalo Bot mới nhất
+      const { data: freshNv } = await supabase
+        .from('nhan_vien')
+        .select('*')
+        .eq('ma_nv', targetNv.ma_nv)
+        .single();
+
+      const nvData = freshNv || targetNv;
+      const uidBot =
+        nvData.uid_zalo ||
+        nvData.id_doan_chat_bot ||
+        '';
+
+      let thongBaoZalo = '';
+
+      // 3. Gọi API gửi Zalo Bot
+      if (uidBot) {
+        const resZalo = await fetch('/api/zalo-bot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'DOI_MAT_KHAU',
+            ma_nv: nvData.ma_nv,
+            ho_ten: nvData.ho_ten,
+            mat_khau_moi: mk,
+            chat_id: uidBot,
+          }),
+        });
+        const dataZalo = await resZalo.json();
+
+        if (dataZalo.success) {
+          thongBaoZalo = `\n📲 Đã gửi tin nhắn Zalo Bot tới UID: ${uidBot}`;
+        } else {
+          thongBaoZalo = `\n❌ Lỗi gửi Zalo: ${JSON.stringify(dataZalo.data || dataZalo.message)}`;
+        }
+      } else {
+        thongBaoZalo = `\n⚠️ Không tìm thấy ID Zalo Bot trong hồ sơ nhân viên này!`;
+      }
+
+      // 4. Đóng modal & thông báo kết quả chi tiết
       setModalPass({ open: false, nv: null });
-      alert(`Đã đổi mật khẩu cho ${modalPass.nv.ho_ten} thành: ${mk}`);
+      baoTin(`Đã đổi mật khẩu cho ${nvData.ho_ten}!`);
+      alert(`✅ Đã đổi mật khẩu cho ${nvData.ho_ten} thành: ${mk}${thongBaoZalo}`);
       loadData();
     } catch (err: any) {
       alert('Lỗi cập nhật: ' + (err?.message || JSON.stringify(err)));
