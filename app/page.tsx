@@ -235,7 +235,7 @@ export default function NhanSuPage() {
         const dataZalo = await resZalo.json();
 
         if (dataZalo.success) {
-          thongBaoZalo = `\n📲 Đã gửi tin nhắn Zalo Bot tới UID: ${uidBot}`;
+          thongBaoZalo = `\n📲 Đã gửi tin nhắn Zalo`;
         } else {
           thongBaoZalo = `\n❌ Lỗi gửi Zalo: ${JSON.stringify(dataZalo.data || dataZalo.message)}`;
         }
@@ -246,7 +246,7 @@ export default function NhanSuPage() {
       // 4. Đóng modal & thông báo kết quả chi tiết
       setModalPass({ open: false, nv: null });
       baoTin(`Đã đổi mật khẩu cho ${nvData.ho_ten}!`);
-      alert(`✅ Đã đổi mật khẩu cho ${nvData.ho_ten} thành: ${mk}${thongBaoZalo}`);
+      alert(`✅ Đã đổi mật khẩu cho ${nvData.ho_ten} thành: ***${thongBaoZalo}`);
       loadData();
     } catch (err: any) {
       alert('Lỗi cập nhật: ' + (err?.message || JSON.stringify(err)));
