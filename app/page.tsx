@@ -71,6 +71,27 @@ export default function NhanSuPage() {
   // State đổi mật khẩu cho Admin
   const [modalPass, setModalPass] = useState<{ open: boolean; nv: any }>({ open: false, nv: null });
   const [newPassword, setNewPassword] = useState('123456');
+  const DANH_MUC_TAI_KHOAN = [
+    { id: 'email_noi_bo', label: '📧 Email nội bộ', defaultLink: 'https://mail.binhduongford.com.vn/' },
+    { id: 'cyber', label: '🖥️ Cyber (Phần mềm DMS)', defaultLink: '' },
+    { id: 'app_sheet', label: '📱 AppSheet', defaultLink: 'https://www.appsheet.com/' },
+    { id: 'sps_id', label: '🌐 SPS ID', defaultLink: '' },
+    { id: 'stars_id', label: '⭐ Stars ID', defaultLink: 'https://www.starsxp.ford.com/' },
+    { id: 'synology', label: '💾 Synology Drive', defaultLink: '' },
+    { id: 'khac', label: '⚙️ Tài khoản khác...', defaultLink: '' },
+  ];
+
+  const [modalZalo, setModalZalo] = useState({
+    open: false,
+    ma_nv: '',
+    loai_tk: 'email_noi_bo',
+    chat_id: '',
+    username: '',
+    password: '',
+    link: '',
+    ghi_chu: '',
+    dangGui: false,
+  });
 
   const isAdmin = currentUser?.phan_quyen === 'ADMIN' || currentUser?.phan_quyen === 'ALL';
 
@@ -253,6 +274,128 @@ export default function NhanSuPage() {
     }
   }
 
+  function layUserTheoLoai(nv: any, loaiId: string): string {
+    if (!nv) return '';
+    switch (loaiId) {
+      case 'email_noi_bo':
+        return nv.email_noi_bo || nv.email_cong_ty || '';
+      case 'cyber':
+        return nv.cyber || nv.tk_cyber || '';
+      case 'app_sheet':
+        return nv.app_sheet || nv.appsheet || nv.email_appsheet || '';
+      case 'sps_id':
+        return nv.sps_id || '';
+      case 'stars_id':
+        return nv.stars_id || '';
+      case 'synology':
+        return nv.synology || '';
+      default:
+        return '';
+    }
+  }
+
+  function layUidZaloNhanVien(nv: any): string {
+    if (!nv) return '6d6fb4ffc0b229ec70a3';
+    return (
+      nv.id_chat_bot ||
+      nv.id_zalo_bot ||
+      nv.bot_chat_id ||
+      nv.uid_zalo ||
+      '6d6fb4ffc0b229ec70a3'
+    );
+  }
+
+  function handleOpenModalZalo(nv: any) {
+    if (!nv) return;
+    if (nv.phan_quyen === 'LOCKED' || nv.trang_thai === 'LOCKED') {
+      baoTin(`Tài khoản ${nv.ho_ten} đang bị khóa!`, 'warning');
+      return;
+    }
+    const loaiMacDinh = 'email_noi_bo';
+    const itemLoai = DANH_MUC_TAI_KHOAN.find((x) => x.id === loaiMacDinh);
+
+    setModalZalo({
+      open: true,
+      ma_nv: nv.ma_nv,
+      loai_tk: loaiMacDinh,
+      chat_id: layUidZaloNhanVien(nv),
+      username: layUserTheoLoai(nv, loaiMacDinh),
+      password: '',
+      link: itemLoai?.defaultLink || '',
+      ghi_chu: '',
+      dangGui: false,
+    });
+  }
+
+  function handleChonNhanVienZalo(maNvMoi: string) {
+    const nvMoi = danhSach.find((x) => x.ma_nv === maNvMoi);
+    setModalZalo((prev) => ({
+      ...prev,
+      ma_nv: maNvMoi,
+      chat_id: layUidZaloNhanVien(nvMoi),
+      username: layUserTheoLoai(nvMoi, prev.loai_tk),
+    }));
+  }
+
+  function handleChonLoaiTaiKhoan(loaiMoi: string) {
+    const nvHienTai = danhSach.find((x) => x.ma_nv === modalZalo.ma_nv);
+    const itemLoai = DANH_MUC_TAI_KHOAN.find((x) => x.id === loaiMoi);
+
+    setModalZalo((prev) => ({
+      ...prev,
+      loai_tk: loaiMoi,
+      username: layUserTheoLoai(nvHienTai, loaiMoi),
+      link: itemLoai?.defaultLink || '',
+    }));
+  }
+
+  async function handleGuiTaiKhoanZalo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!modalZalo.ma_nv || !modalZalo.username.trim() || !modalZalo.password.trim()) {
+      alert('Vui lòng nhập đầy đủ Tên đăng nhập và Mật khẩu!');
+      return;
+    }
+    if (!modalZalo.chat_id.trim()) {
+      alert('Vui lòng nhập ID đoạn chat Zalo nhận!');
+      return;
+    }
+
+    const nvNhan = danhSach.find((x) => x.ma_nv === modalZalo.ma_nv);
+    const itemLoai = DANH_MUC_TAI_KHOAN.find((x) => x.id === modalZalo.loai_tk);
+    const tenLoaiSach = (itemLoai?.label || modalZalo.loai_tk).replace(/^[^\w\sÀ-ỹ]+\s*/, '');
+
+    setModalZalo((prev) => ({ ...prev, dangGui: true }));
+    try {
+      const res = await fetch('/api/zalo-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'GUI_TAI_KHOAN',
+          ma_nv: modalZalo.ma_nv,
+          ho_ten: nvNhan?.ho_ten || modalZalo.ma_nv,
+          loai_tai_khoan: tenLoaiSach,
+          ten_dang_nhap: modalZalo.username.trim(),
+          mat_khau: modalZalo.password.trim(),
+          duong_dan: modalZalo.link.trim(),
+          ghi_chu: modalZalo.ghi_chu.trim(),
+          chat_id: modalZalo.chat_id.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        baoTin(`Đã bắn thông tin ${tenLoaiSach} tới ${nvNhan?.ho_ten || modalZalo.ma_nv}!`);
+        setModalZalo((prev) => ({ ...prev, open: false, dangGui: false }));
+      } else {
+        alert('❌ Lỗi gửi Zalo: ' + (data.message || JSON.stringify(data.data)));
+        setModalZalo((prev) => ({ ...prev, dangGui: false }));
+      }
+    } catch (err: any) {
+      alert('Lỗi kết nối: ' + err.message);
+      setModalZalo((prev) => ({ ...prev, dangGui: false }));
+    }
+  }
+
   const ketQuaLoc = useMemo(() => {
     const k = (tuKhoa || '').toLowerCase().trim();
     if (!Array.isArray(danhSach)) return [];
@@ -375,7 +518,7 @@ export default function NhanSuPage() {
           onEdit={handleEdit}
           onToggleKhoa={handleToggleKhoa}
           onDelete={handleDelete}
-          onNotifyZalo={(nv: any) => baoTin(`Gửi Zalo đến ${nv?.ho_ten || ''} (${nv?.uid_zalo || 'Chưa có UID'})`)}
+          onNotifyZalo={(nv: any) => handleOpenModalZalo(nv)}
           onDoiMatKhau={isAdmin
     ? (nv: any) => {
         if (nv?.phan_quyen === 'LOCKED' || nv?.trang_thai === 'LOCKED') {
@@ -479,6 +622,266 @@ export default function NhanSuPage() {
           </div>
         </div>
       )}
+
+      {/* POPUP GỬI THÔNG TIN TÀI KHOẢN QUA ZALO */}
+      {modalZalo.open && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+            fontFamily: 'Segoe UI, sans-serif',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '500px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.25)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '18px' }}>✈️</span>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#0284c7' }}>
+                  GỬI THÔNG TIN TÀI KHOẢN QUA ZALO
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalZalo((prev) => ({ ...prev, open: false }))}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '18px',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuiTaiKhoanZalo} style={{ padding: '20px' }}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                  Chọn nhân viên nhận <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  value={modalZalo.ma_nv}
+                  onChange={(e) => handleChonNhanVienZalo(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    color: '#0284c7',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  {danhSach
+                    .filter((x) => x.phan_quyen !== 'LOCKED')
+                    .map((nv) => (
+                      <option key={nv.ma_nv} value={nv.ma_nv}>
+                        {nv.ma_nv} - {nv.ho_ten}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                    Loại tài khoản <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={modalZalo.loai_tk}
+                    onChange={(e) => handleChonLoaiTaiKhoan(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #93c5fd',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#0f172a',
+                      backgroundColor: '#fff',
+                    }}
+                  >
+                    {DANH_MUC_TAI_KHOAN.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                    ID đoạn chat Zalo nhận
+                  </label>
+                  <input
+                    type="text"
+                    value={modalZalo.chat_id}
+                    onChange={(e) => setModalZalo((prev) => ({ ...prev, chat_id: e.target.value }))}
+                    placeholder="Nhập UID Zalo..."
+                    style={{
+                      width: '100%',
+                      padding: '9px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#047857',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                  Tên đăng nhập (User) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={modalZalo.username}
+                  onChange={(e) => setModalZalo((prev) => ({ ...prev, username: e.target.value }))}
+                  placeholder="Nhập tên đăng nhập..."
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                  Mật khẩu (Password) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={modalZalo.password}
+                  onChange={(e) => setModalZalo((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="Nhập mật khẩu cấp mới"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                  Đường dẫn đăng nhập (Link)
+                </label>
+                <input
+                  type="text"
+                  value={modalZalo.link}
+                  onChange={(e) => setModalZalo((prev) => ({ ...prev, link: e.target.value }))}
+                  placeholder="https://..."
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                  Ghi chú kèm theo
+                </label>
+                <input
+                  type="text"
+                  value={modalZalo.ghi_chu}
+                  onChange={(e) => setModalZalo((prev) => ({ ...prev, ghi_chu: e.target.value }))}
+                  placeholder="VD: Đổi pass sau khi login"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalZalo((prev) => ({ ...prev, open: false }))}
+                  style={{
+                    padding: '9px 16px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#334155',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalZalo.dangGui}
+                  style={{
+                    padding: '9px 18px',
+                    backgroundColor: '#0284c7',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    cursor: modalZalo.dangGui ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  ✈️ {modalZalo.dangGui ? 'Đang gửi...' : 'Bắn Tin Nhắn Zalo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }

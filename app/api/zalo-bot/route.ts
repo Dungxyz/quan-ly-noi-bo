@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 👤 Nhân sự: <b>${ho_ten}</b> (${ma_nv})
 🔐 Mật khẩu mới: <b>${mat_khau_moi}</b>
 ⏰ Thời gian: ${thoiGianStr}
-⚠️ <i>Vui lòng đăng nhập và bảo mật thông tin tài khoản.</i>`;
+⚠️ Vui lòng đăng nhập và bảo mật thông tin tài khoản.`;
 
       const res = await fetch(ZALO_BOT_URL, {
         method: 'POST',
@@ -59,7 +59,57 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
-    // 2. NHÁNH GỬI THÔNG BÁO TIẾP NHẬN / ĐIỀU CHUYỂN XE DỊCH VỤ (NHƯ CODE CỦA BẠN)
+    // 2. NHÁNH GỬI THÔNG BÁO THÔNG TIN TÀI KHOẢN QUA ZALO
+    // =========================================================================
+    if (body.type === 'GUI_TAI_KHOAN') {
+      const {
+        ma_nv,
+        ho_ten,
+        loai_tai_khoan,
+        ten_dang_nhap,
+        mat_khau,
+        duong_dan,
+        ghi_chu,
+        chat_id,
+      } = body;
+
+      const cleanUid = chat_id ? String(chat_id).trim() : '';
+      if (!cleanUid) {
+        return NextResponse.json({
+          success: false,
+          message: 'Vui lòng nhập ID đoạn chat Zalo nhận!',
+        });
+      }
+
+      const noiDungTaiKhoan = `🔐 <b>[BÌNH PHƯỚC FORD - CẤP TÀI KHOẢN HỆ THỐNG]</b>
+━━━━━━━━━━━━━━━━━━━━
+👤 Nhân sự: <b>${ho_ten}</b> (${ma_nv})
+📌 Loại tài khoản: <b>${loai_tai_khoan}</b>
+🆔 Tên đăng nhập (User): <b>${ten_dang_nhap}</b>
+🔑 Mật khẩu (Password): <b>${mat_khau}</b>${duong_dan ? `\n🌐 Đường dẫn: ${duong_dan}` : ''}${ghi_chu ? `\n📝 Ghi chú: ${ghi_chu}` : ''}
+⏰ Thời gian cấp: ${thoiGianStr}
+⚠️ Vui lòng đăng nhập và bảo mật thông tin tài khoản.`;
+
+      const res = await fetch(ZALO_BOT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: cleanUid,
+          text: noiDungTaiKhoan,
+          parse_mode: 'HTML',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false || (data?.error && data.error !== 0)) {
+        return NextResponse.json({ success: false, message: 'Zalo API từ chối', data });
+      }
+
+      return NextResponse.json({ success: true, data });
+    }
+
+    // =========================================================================
+    // 3. NHÁNH GỬI THÔNG BÁO TIẾP NHẬN / ĐIỀU CHUYỂN XE DỊCH VỤ
     // =========================================================================
     const {
       bien_so,
