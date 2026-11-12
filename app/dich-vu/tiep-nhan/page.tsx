@@ -26,6 +26,20 @@ export default function TiepNhanXePage() {
   const [modalEditOpen, setModalEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<any>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [oldCoVan, setOldCoVan] = useState<string>(''); // Lưu cố vấn cũ để đối chiếu khi sửa
+
+  // Hàm lấy ID Chat Bot của cố vấn từ danh sách nhân viên
+  function layIdChatBot(tenHoacMaCV: string): string {
+    if (!tenHoacMaCV) return '';
+    const cvObj = danhSachCoVan.find(
+      (cv) =>
+        tenHoacMaCV.includes(cv.ma_nv) ||
+        tenHoacMaCV.toLowerCase().includes((cv.ho_ten || '').toLowerCase())
+    );
+    if (!cvObj) return '';
+    // Kiểm tra linh hoạt tên cột lưu ID bot trong database
+    return cvObj.id_chat_bot || cvObj.bot_chat_id || cvObj.uid_zalo || cvObj.id_zalo_bot || '';
+  }
 
   // Form state
   const [form, setForm] = useState({
@@ -184,11 +198,21 @@ export default function TiepNhanXePage() {
         { onConflict: 'bien_so' }
       );
 
-      // 3. Tìm id_chat_bot của cố vấn được chọn
-      const coVanChon = danhSachCoVan.find((cv) =>
-        form.co_van_vien.includes(cv.ma_nv) || cv.ho_ten === form.co_van_vien
-      );
-      const chatIdCVDV = coVanChon?.id_chat_bot || '';
+        // 3. Lấy ID Chat Bot của cố vấn được chọn và gửi thông báo
+      const chatIdCVDV = layIdChatBot(form.co_van_vien);
+
+      try {
+        await fetch('/api/zalo-bot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            chat_id: chatIdCVDV,
+          }),
+        });
+      } catch (botErr) {
+        console.warn('Lỗi gửi Zalo Bot:', botErr);
+      }
 
       // 4. Bắn Zalo Bot qua API Next.js
       try {
@@ -244,7 +268,7 @@ export default function TiepNhanXePage() {
     return false;
   }
 
-  // 5. Mở modal Sửa
+  /// 5. Mở modal Sửa
   function handleOpenEdit(row: any) {
     if (!canEdit) {
       alert('Tài khoản của bạn không có quyền chỉnh sửa tiếp nhận xe!');
@@ -254,11 +278,12 @@ export default function TiepNhanXePage() {
       alert('Lượt tiếp nhận này đã bị khóa (sau 18h00 hoặc đã qua ngày), không thể sửa!');
       return;
     }
+    setOldCoVan(row.co_van_vien || ''); // Ghi nhớ cố vấn ban đầu
     setEditRow({ ...row });
     setModalEditOpen(true);
   }
 
-  // 6. Lưu Sửa
+  // 6. Lưu Sửa & Gửi thông báo nếu điều chuyển cố vấn khác
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editRow || !canEdit) return;
@@ -278,7 +303,48 @@ export default function TiepNhanXePage() {
         .eq('no_id', editRow.no_id);
 
       if (error) throw error;
-      alert(`Đã cập nhật lượt tiếp nhận xe ${editRow.bien_so}!`);
+
+      // Đồng bộ lại thông tin cố vấn sang bảng khách hàng
+      await supabase
+        .from('dich_vu_khach_hang')
+        .update({
+          ten_khach_hang: editRow.ten_khach_hang,
+          so_dien_thoai: editRow.so_dien_thoai,
+          co_van: editRow.co_van_vien,
+          hang_muc_du_kien: editRow.hang_muc_thuc_hien,
+          trang_thai_hen: editRow.trang_thai_hen,
+        })
+        .eq('bien_so', editRow.bien_so);
+
+      // Kiểm tra nếu có sự thay đổi Cố vấn viên -> Gửi tin nhắn điều chuyển cho cố vấn mới
+      if (editRow.co_van_vien && editRow.co_van_vien !== oldCoVan) {
+        const chatIdMoi = layIdChatBot(editRow.co_van_vien);
+        try {
+          await fetch('/api/zalo-bot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bien_so: editRow.bien_so,
+              ten_khach_hang: editRow.ten_khach_hang,
+              so_dien_thoai: editRow.so_dien_thoai,
+              co_van_vien: editRow.co_van_vien,
+              hang_muc_thuc_hien: editRow.hang_muc_thuc_hien,
+              trang_thai_hen: editRow.trang_thai_hen,
+              ghi_chu: editRow.ghi_chu,
+              chat_id: chatIdMoi,
+              co_van_cu: oldCoVan, // Truyền tên cố vấn cũ sang API
+            }),
+          });
+        } catch (botErr) {
+          console.warn('Lỗi gửi tin điều chuyển Zalo:', botErr);
+        }
+      }
+
+      alert(
+        editRow.co_van_vien !== oldCoVan
+          ? `✅ Đã cập nhật và gửi thông báo điều chuyển xe ${editRow.bien_so} sang cho ${editRow.co_van_vien}!`
+          : `✅ Đã cập nhật lượt tiếp nhận xe ${editRow.bien_so}!`
+      );
       setModalEditOpen(false);
       loadInitData();
     } catch (err: any) {
