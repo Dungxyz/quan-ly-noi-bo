@@ -31,14 +31,15 @@ export default function TiepNhanXePage() {
   // Hàm lấy ID Chat Bot của cố vấn từ danh sách nhân viên
   function layIdChatBot(tenHoacMaCV: string): string {
     if (!tenHoacMaCV) return '';
-    const cvObj = danhSachCoVan.find(
-      (cv) =>
-        tenHoacMaCV.includes(cv.ma_nv) ||
-        tenHoacMaCV.toLowerCase().includes((cv.ho_ten || '').toLowerCase())
-    );
+    const searchStr = tenHoacMaCV.toLowerCase().trim();
+    const cvObj = danhSachCoVan.find((cv) => {
+      const ma = (cv.ma_nv || '').toLowerCase().trim();
+      const ten = (cv.ho_ten || '').toLowerCase().trim();
+      return (ma && searchStr.includes(ma)) || (ten && searchStr.includes(ten));
+    });
     if (!cvObj) return '';
     // Kiểm tra linh hoạt tên cột lưu ID bot trong database
-    return cvObj.id_chat_bot || cvObj.bot_chat_id || cvObj.uid_zalo || cvObj.id_zalo_bot || '';
+    return cvObj.uid_zalo || cvObj.id_doan_chat_bot || '';
   }
 
   // Form state
