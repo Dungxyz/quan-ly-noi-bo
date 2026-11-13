@@ -79,7 +79,7 @@ export default function QuanLyDatHoaPage() {
             .filter((val) => typeof val === 'string')
             .join(' ')
             .toLowerCase();
-          return allText.includes('tư vấn bán hàng') || allText.includes('tvbh');
+          return allText.includes('Tư vấn bán hàng') || allText.includes('TVBH');
         });
 
         // Nếu không tìm thấy chữ "tư vấn bán hàng", lấy tất cả nhân viên bộ phận Kinh doanh
