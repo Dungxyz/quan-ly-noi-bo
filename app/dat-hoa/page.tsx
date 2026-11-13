@@ -9,15 +9,18 @@ const supabase = createClient(
 );
 
 export default function QuanLyDatHoaPage() {
+  // Tab chính của phân hệ: 'DAT_HOA' | 'BAO_CAO'
+  const [mainTab, setMainTab] = useState<'DAT_HOA' | 'BAO_CAO'>('DAT_HOA');
+
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [danhSachHoa, setDanhSachHoa] = useState<any[]>([]);
   const [danhSachTVBH, setDanhSachTVBH] = useState<any[]>([]);
   const [danhSachPGD, setDanhSachPGD] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // State của tab ĐẶT HOA GIAO XE
   const [search, setSearch] = useState('');
   const [tabTrangThai, setTabTrangThai] = useState<'CHUA_DUYET' | 'DA_DUYET' | 'TAT_CA'>('CHUA_DUYET');
-
-  // State Form tạo đơn đặt hoa
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isAfter1630, setIsAfter1630] = useState(false);
@@ -33,7 +36,19 @@ export default function QuanLyDatHoaPage() {
     ghi_chu: '',
   });
 
-  // Helper chuẩn hóa chuỗi để so sánh không lệch dấu/khoảng trắng
+  // State bộ lọc của tab BÁO CÁO
+  const [tuNgay, setTuNgay] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [denNgay, setDenNgay] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  });
+  const [chonPhongBC, setChonPhongBC] = useState<string>('TAT_CA');
+  const [chonTrangThaiBC, setChonTrangThaiBC] = useState<string>('TAT_CA');
+
+  // Helper chuẩn hóa chuỗi
   function norm(val: any): string {
     return String(val || '')
       .toLowerCase()
@@ -41,19 +56,16 @@ export default function QuanLyDatHoaPage() {
       .trim();
   }
 
-  // Helper lấy giá trị cột Phòng của nhân viên (VD: "Kinh doanh 1", "Kinh doanh 2")
   function layPhongCuaNV(nv: any): string {
     if (!nv) return '';
     return String(nv.phong || nv.phong_ban || nv.ten_phong || '').trim();
   }
 
-  // Helper lấy giá trị cột Bộ Phận (VD: "Kinh doanh", "HCNS")
   function layBoPhanCuaNV(nv: any): string {
     if (!nv) return '';
     return String(nv.bo_phan || '').trim();
   }
 
-  // Helper lấy giá trị cột Vị Trí / Chức Vụ
   function layViTriCuaNV(nv: any): string {
     if (!nv) return '';
     return String(nv.vi_tri || nv.chuc_vu || nv.chuc_danh || '').trim();
@@ -75,7 +87,6 @@ export default function QuanLyDatHoaPage() {
   async function loadData() {
     setLoading(true);
     try {
-      // 1. Lấy toàn bộ nhân sự từ bảng nhan_vien
       const { data: nvData, error: nvError } = await supabase
         .from('nhan_vien')
         .select('*')
@@ -83,11 +94,10 @@ export default function QuanLyDatHoaPage() {
 
       if (nvError) {
         alert('❌ Lỗi truy vấn bảng nhan_vien: ' + nvError.message);
-        console.error('Lỗi tải bảng nhan_vien:', nvError);
       }
 
       if (nvData && nvData.length > 0) {
-        // --- TỰ ĐỘNG NHẬN DIỆN NGƯỜI ĐĂNG NHẬP TỪ STORAGE / COOKIE ---
+        // Tự động nhận diện tài khoản đang đăng nhập
         const allRawStrings: string[] = [];
         for (let i = 0; i < window.localStorage.length; i++) {
           const k = window.localStorage.key(i);
@@ -109,9 +119,8 @@ export default function QuanLyDatHoaPage() {
         if (detectedUser) {
           setCurrentUser(detectedUser);
         }
-        // -------------------------------------------------------------
 
-        // Lọc bỏ tài khoản bị khóa (LOCKED) và đã nghỉ việc
+        // Lọc nhân sự đang hoạt động
         const nvHoatDong = nvData.filter(
           (nv) =>
             nv.phan_quyen !== 'LOCKED' &&
@@ -119,14 +128,14 @@ export default function QuanLyDatHoaPage() {
             norm(nv.tinh_trang) !== 'đã nghỉ việc'
         );
 
-        // Lấy đúng những người có Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
+        // Lấy đúng vị trí Tư vấn bán hàng / TVBH
         const tvbhList = nvHoatDong.filter((nv) => {
           const vt = norm(layViTriCuaNV(nv));
           return vt.includes('tư vấn bán hàng') || vt === 'tvbh';
         });
         setDanhSachTVBH(tvbhList);
 
-        // Lọc Phó Giám đốc Kinh doanh (của các phòng)
+        // Lấy Phó Giám đốc Kinh doanh
         const pgdList = nvHoatDong.filter((nv) => {
           const bp = norm(layBoPhanCuaNV(nv));
           const vt = norm(layViTriCuaNV(nv));
@@ -135,7 +144,6 @@ export default function QuanLyDatHoaPage() {
         setDanhSachPGD(pgdList);
       }
 
-      // 2. Lấy danh sách đơn đặt hoa
       const { data: hoaData } = await supabase
         .from('kinh_doanh_dat_hoa')
         .select('*')
@@ -150,7 +158,7 @@ export default function QuanLyDatHoaPage() {
   }
 
   // =========================================================================
-  // PHÂN QUYỀN XEM & DUYỆT ĐƠN ĐẶT HOA
+  // PHÂN QUYỀN XEM, TẠO & DUYỆT ĐƠN ĐẶT HOA
   // =========================================================================
   function getVaiTroUser(user: any) {
     if (!user) return { isToanQuyen: false, isPGDKD: false, phongPGD: '', maNV: '' };
@@ -161,13 +169,11 @@ export default function QuanLyDatHoaPage() {
     const phong = norm(layPhongCuaNV(user));
     const maNV = String(user.ma_nv || '').trim();
 
-    // 1. Admin hoặc HCNS có thẩm quyền (Nhân viên HCNS, Nhân viên IT, Phó phòng HCNS)
     const isAdmin = role === 'ADMIN';
     const isHCNSQuyen =
       bp === 'hcns' &&
       (vt === 'nhân viên hcns' || vt === 'nhân viên it' || vt === 'phó phòng hcns');
 
-    // 2. Kinh doanh / Phó Giám đốc Kinh doanh
     const isPGDKD =
       bp === 'kinh doanh' &&
       (vt === 'phó giám đốc kinh doanh' || vt.includes('phó giám đốc kinh doanh'));
@@ -180,35 +186,28 @@ export default function QuanLyDatHoaPage() {
     };
   }
 
-  // Kiểm tra user có được PHÉP NHÌN THẤY đơn này trong danh sách không
+  const { isToanQuyen, isPGDKD, phongPGD, maNV } = getVaiTroUser(currentUser);
+  const coQuyenChonTVBH = isToanQuyen;
+  const coQuyenTaoPhieu = isToanQuyen || !isPGDKD;
+
   function coQuyenXemDon(don: any): boolean {
     if (!currentUser) return false;
-    const { isToanQuyen, isPGDKD, phongPGD, maNV } = getVaiTroUser(currentUser);
-
-    // Admin và HCNS được phân quyền: thấy tất cả đơn
     if (isToanQuyen) return true;
 
-    // Phó Giám đốc Kinh doanh: chỉ thấy đơn của đúng Phòng mình phụ trách (VD: Kinh doanh 1 / Kinh doanh 2)
     if (isPGDKD) {
       const phongDon = norm(don.phong_kinh_doanh);
       return phongPGD !== '' && phongDon === phongPGD;
     }
 
-    // Các tài khoản còn lại (TVBH...): chỉ thấy đơn của chính tài khoản đó, không thấy của người khác
     const maDon = String(don.ma_nv_tvbh || '').trim();
     const tenDon = String(don.tu_van_ban_hang || '').trim();
     return (maNV !== '' && maDon === maNV) || (maNV !== '' && tenDon.startsWith(maNV));
   }
 
-  // Kiểm tra user có được PHÉP BẤM NÚT DUYỆT / TỪ CHỐI trên đơn này không
   function coQuyenDuyetDon(don: any): boolean {
     if (!currentUser) return false;
-    const { isToanQuyen, isPGDKD, phongPGD } = getVaiTroUser(currentUser);
-
-    // Admin và HCNS (Nhân viên HCNS, Nhân viên IT, Phó phòng HCNS)
     if (isToanQuyen) return true;
 
-    // Phó Giám đốc Kinh doanh: chỉ duyệt đơn của đúng Phòng mình
     if (isPGDKD) {
       const phongDon = norm(don.phong_kinh_doanh);
       return phongPGD !== '' && phongDon === phongPGD;
@@ -216,8 +215,6 @@ export default function QuanLyDatHoaPage() {
 
     return false;
   }
-  // Chỉ ADMIN hoặc HCNS (Nhân viên HCNS, Nhân viên IT, Phó phòng HCNS) mới được chọn TVBH khác
-  const coQuyenChonTVBH = getVaiTroUser(currentUser).isToanQuyen;
 
   // Mở form tạo đơn đặt hoa
   function handleOpenForm() {
@@ -226,7 +223,6 @@ export default function QuanLyDatHoaPage() {
     setImageFile(null);
     setImagePreview('');
 
-    // Nếu không có quyền chọn TVBH khác -> khóa cứng theo chính tài khoản đang đăng nhập
     const maMacDinh = coQuyenChonTVBH ? '' : String(currentUser?.ma_nv || '').trim();
 
     setForm({
@@ -253,12 +249,13 @@ export default function QuanLyDatHoaPage() {
     const sau1630HienTai = checkSau16h30();
     setIsAfter1630(sau1630HienTai);
 
-    if (!form.ma_nv_tvbh || !form.ten_khach_hang.trim() || !form.hop_dong_so.trim() || !form.ngay_gio_giao_xe) {
+    const maNVChot = coQuyenChonTVBH ? form.ma_nv_tvbh : String(currentUser?.ma_nv || '').trim();
+
+    if (!maNVChot || !form.ten_khach_hang.trim() || !form.hop_dong_so.trim() || !form.ngay_gio_giao_xe) {
       alert('Vui lòng nhập đầy đủ các trường bắt buộc (*)');
       return;
     }
 
-    // Bắt buộc chụp/đính kèm ảnh nếu đặt sau 16h30
     if (sau1630HienTai && !imageFile) {
       alert('⚠️ Hiện tại đã quá 16h30! Bạn bắt buộc phải chụp hoặc tải lên hình ảnh xác nhận để gửi duyệt.');
       return;
@@ -283,12 +280,10 @@ export default function QuanLyDatHoaPage() {
         uploadedImageUrl = pubUrl.publicUrl;
       }
 
-      // Tìm thông tin TVBH & đúng tên Phòng (Kinh doanh 1 / Kinh doanh 2)
-      const tvbhObj = danhSachTVBH.find((x) => x.ma_nv === form.ma_nv_tvbh);
-      const tenHienThiTVBH = tvbhObj ? `${tvbhObj.ma_nv} ${tvbhObj.ho_ten}` : form.ma_nv_tvbh;
+      const tvbhObj = danhSachTVBH.find((x) => x.ma_nv === maNVChot) || currentUser;
+      const tenHienThiTVBH = tvbhObj ? `${tvbhObj.ma_nv} ${tvbhObj.ho_ten}` : maNVChot;
       const phongKD = layPhongCuaNV(tvbhObj) || layBoPhanCuaNV(tvbhObj) || 'Kinh doanh';
 
-      // Tìm Phó Giám đốc Kinh doanh phụ trách đúng Phòng đó để lấy ID Zalo Bot
       const pgdPhuTrach = danhSachPGD.find(
         (pgd) => norm(layPhongCuaNV(pgd)) === norm(phongKD)
       );
@@ -298,11 +293,10 @@ export default function QuanLyDatHoaPage() {
         pgdPhuTrach?.uid_zalo ||
         '';
 
-      // Insert vào Supabase
       const { error: insertErr } = await supabase.from('kinh_doanh_dat_hoa').insert([
         {
           tu_van_ban_hang: tenHienThiTVBH,
-          ma_nv_tvbh: form.ma_nv_tvbh,
+          ma_nv_tvbh: maNVChot,
           phong_kinh_doanh: phongKD,
           ten_khach_hang: form.ten_khach_hang.trim(),
           hop_dong_so: form.hop_dong_so.trim(),
@@ -325,7 +319,6 @@ export default function QuanLyDatHoaPage() {
         year: 'numeric',
       });
 
-      // Bắn thông báo Zalo tới Phó GĐKD phòng đó & nhóm chung
       await fetch('/api/zalo-bot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -418,10 +411,11 @@ export default function QuanLyDatHoaPage() {
     }
   }
 
-  // Bước 1: Lọc danh sách theo đúng quyền xem của tài khoản đang đăng nhập
+  // =========================================================================
+  // DỮ LIỆU CHO TAB 1: ĐẶT HOA GIAO XE
+  // =========================================================================
   const dsTheoQuyen = danhSachHoa.filter((item) => coQuyenXemDon(item));
 
-  // Bước 2: Lọc tiếp theo Tab trạng thái và ô Tìm kiếm
   const dsHienThi = dsTheoQuyen.filter((item) => {
     const matchTab = tabTrangThai === 'TAT_CA' ? true : item.trang_thai === tabTrangThai;
     const kw = search.toLowerCase().trim();
@@ -437,199 +431,639 @@ export default function QuanLyDatHoaPage() {
   const soLuongChuaDuyet = dsTheoQuyen.filter((x) => x.trang_thai === 'CHUA_DUYET').length;
   const soLuongDaDuyet = dsTheoQuyen.filter((x) => x.trang_thai === 'DA_DUYET').length;
 
-  // Phó Giám đốc Kinh doanh chỉ duyệt đơn, không hiển thị nút tạo phiếu đặt hoa
-  const { isPGDKD, isToanQuyen } = getVaiTroUser(currentUser);
-  const coQuyenTaoPhieu = isToanQuyen || !isPGDKD;
+  // =========================================================================
+  // DỮ LIỆU CHO TAB 2: BÁO CÁO
+  // =========================================================================
+  const duLieuBaoCao = dsTheoQuyen.filter((item) => {
+    const ngayTao = new Date(item.dau_thoi_gian).toISOString().split('T')[0];
+    if (tuNgay && ngayTao < tuNgay) return false;
+    if (denNgay && ngayTao > denNgay) return false;
+
+    if (chonPhongBC !== 'TAT_CA' && norm(item.phong_kinh_doanh) !== norm(chonPhongBC)) {
+      return false;
+    }
+
+    if (chonTrangThaiBC !== 'TAT_CA' && item.trang_thai !== chonTrangThaiBC) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const bcTongDon = duLieuBaoCao.length;
+  const bcDaDuyet = duLieuBaoCao.filter((x) => x.trang_thai === 'DA_DUYET').length;
+  const bcChuaDuyet = duLieuBaoCao.filter((x) => x.trang_thai === 'CHUA_DUYET').length;
+  const bcTuChoi = duLieuBaoCao.filter((x) => x.trang_thai === 'TU_CHOI').length;
+  const bcSau1630 = duLieuBaoCao.filter((x) => x.dat_sau_16h30 === true).length;
+
+  const thongKePhongMap: Record<string, { tong: number; daDuyet: number; chuaDuyet: number; tuChoi: number; tre1630: number }> = {};
+  duLieuBaoCao.forEach((item) => {
+    const tenPhong = item.phong_kinh_doanh || 'Chưa phân phòng';
+    if (!thongKePhongMap[tenPhong]) {
+      thongKePhongMap[tenPhong] = { tong: 0, daDuyet: 0, chuaDuyet: 0, tuChoi: 0, tre1630: 0 };
+    }
+    thongKePhongMap[tenPhong].tong += 1;
+    if (item.trang_thai === 'DA_DUYET') thongKePhongMap[tenPhong].daDuyet += 1;
+    if (item.trang_thai === 'CHUA_DUYET') thongKePhongMap[tenPhong].chuaDuyet += 1;
+    if (item.trang_thai === 'TU_CHOI') thongKePhongMap[tenPhong].tuChoi += 1;
+    if (item.dat_sau_16h30) thongKePhongMap[tenPhong].tre1630 += 1;
+  });
+
+  const thongKeTVBHMap: Record<string, { ten: string; phong: string; tong: number; daDuyet: number; tre1630: number }> = {};
+  duLieuBaoCao.forEach((item) => {
+    const key = item.tu_van_ban_hang || 'Không rõ';
+    if (!thongKeTVBHMap[key]) {
+      thongKeTVBHMap[key] = {
+        ten: key,
+        phong: item.phong_kinh_doanh || '---',
+        tong: 0,
+        daDuyet: 0,
+        tre1630: 0,
+      };
+    }
+    thongKeTVBHMap[key].tong += 1;
+    if (item.trang_thai === 'DA_DUYET') thongKeTVBHMap[key].daDuyet += 1;
+    if (item.dat_sau_16h30) thongKeTVBHMap[key].tre1630 += 1;
+  });
+  const dsThongKeTVBH = Object.values(thongKeTVBHMap).sort((a, b) => b.tong - a.tong);
+
+  function handleExportCSV() {
+    if (duLieuBaoCao.length === 0) {
+      alert('Không có dữ liệu trong khoảng thời gian đã chọn để xuất!');
+      return;
+    }
+
+    const headers = [
+      'STT',
+      'Thời gian đặt',
+      'Phòng Kinh Doanh',
+      'Tư vấn bán hàng',
+      'Tên khách hàng',
+      'Số hợp đồng',
+      'Số VIN / Biển số',
+      'Ngày giờ giao xe',
+      'Đặt sau 16h30',
+      'Trạng thái',
+      'Người duyệt',
+      'Ghi chú / Lý do',
+    ];
+
+    const rows = duLieuBaoCao.map((r, idx) => {
+      const trangThaiText =
+        r.trang_thai === 'DA_DUYET'
+          ? 'Đã duyệt'
+          : r.trang_thai === 'TU_CHOI'
+          ? 'Từ chối'
+          : 'Chờ duyệt';
+
+      return [
+        idx + 1,
+        new Date(r.dau_thoi_gian).toLocaleString('vi-VN'),
+        r.phong_kinh_doanh || '',
+        r.tu_van_ban_hang || '',
+        r.ten_khach_hang || '',
+        r.hop_dong_so || '',
+        r.so_vin_bien_so || '',
+        new Date(r.ngay_gio_giao_xe).toLocaleString('vi-VN'),
+        r.dat_sau_16h30 ? 'Có (Sau 16h30)' : 'Đúng giờ',
+        trangThaiText,
+        r.nguoi_duyet || '',
+        r.trang_thai === 'TU_CHOI' ? r.ly_do_tu_choi || '' : r.ghi_chu || '',
+      ]
+        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+        .join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Bao_Cao_Dat_Hoa_${tuNgay}_den_${denNgay}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Segoe UI, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      {/* Thanh tiêu đề & tìm kiếm */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+      {/* HEADER CHUNG CỦA PHÂN HỆ QUẢN LÝ ĐẶT HOA & THANH CHUYỂN 2 MỤC CON */}
+      <div
+        style={{
+          backgroundColor: '#fff',
+          padding: '16px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          marginBottom: '18px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '14px',
+        }}
+      >
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>
-            💐 QUẢN LÝ ĐẶT HOA GIAO XE
+            🌸 QUẢN LÝ ĐẶT HOA
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
             Quy định: Đặt hoa trước <b>16h30</b>. Sau 16h30 bắt buộc đính kèm hình ảnh xác nhận để Phó GĐKD từng phòng duyệt.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <input
-            type="text"
-            placeholder="🔍 Tìm KH, Số HĐ, TVBH, Biển số..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', width: '250px' }}
-          />
-          {coQuyenTaoPhieu && (
+        {/* 2 Tab phân hệ con: ĐẶT HOA GIAO XE & BÁO CÁO */}
+        <div style={{ display: 'flex', gap: '8px', backgroundColor: '#f1f5f9', padding: '5px', borderRadius: '10px' }}>
           <button
-            onClick={handleOpenForm}
+            onClick={() => setMainTab('DAT_HOA')}
             style={{
-              padding: '9px 16px',
-              backgroundColor: '#0284c7',
-              color: '#fff',
-              border: 'none',
+              padding: '9px 18px',
               borderRadius: '8px',
+              border: 'none',
+              backgroundColor: mainTab === 'DAT_HOA' ? '#0284c7' : 'transparent',
+              color: mainTab === 'DAT_HOA' ? '#fff' : '#334155',
               fontWeight: 'bold',
               fontSize: '13px',
               cursor: 'pointer',
+              boxShadow: mainTab === 'DAT_HOA' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
             }}
           >
-            + Tạo Phiếu Đặt Hoa
-          </button>)}
+            💐 ĐẶT HOA GIAO XE
+          </button>
+          <button
+            onClick={() => setMainTab('BAO_CAO')}
+            style={{
+              padding: '9px 18px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: mainTab === 'BAO_CAO' ? '#0284c7' : 'transparent',
+              color: mainTab === 'BAO_CAO' ? '#fff' : '#334155',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: mainTab === 'BAO_CAO' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
+            }}
+          >
+            📊 BÁO CÁO
+          </button>
         </div>
       </div>
 
-      {/* Tabs trạng thái */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <button
-          onClick={() => setTabTrangThai('CHUA_DUYET')}
-          style={{
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: '1px solid #f59e0b',
-            backgroundColor: tabTrangThai === 'CHUA_DUYET' ? '#fef3c7' : '#fff',
-            color: '#b45309',
-            fontWeight: 'bold',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          ⏳ CHƯA DUYỆT ({soLuongChuaDuyet})
-        </button>
-        <button
-          onClick={() => setTabTrangThai('DA_DUYET')}
-          style={{
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: '1px solid #10b981',
-            backgroundColor: tabTrangThai === 'DA_DUYET' ? '#d1fae5' : '#fff',
-            color: '#047857',
-            fontWeight: 'bold',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          ✅ ĐÃ DUYỆT ({soLuongDaDuyet})
-        </button>
-        <button
-          onClick={() => setTabTrangThai('TAT_CA')}
-          style={{
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: '1px solid #cbd5e1',
-            backgroundColor: tabTrangThai === 'TAT_CA' ? '#e2e8f0' : '#fff',
-            color: '#334155',
-            fontWeight: 'bold',
-            fontSize: '13px',
-            cursor: 'pointer',
-          }}
-        >
-          📋 TẤT CẢ ({dsTheoQuyen.length})
-        </button>
-      </div>
+      {/* ===================================================================== */}
+      {/* NỘI DUNG 1: ĐẶT HOA GIAO XE                                           */}
+      {/* ===================================================================== */}
+      {mainTab === 'DAT_HOA' && (
+        <>
+          {/* Thanh công cụ tìm kiếm & Tạo phiếu */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            {/* Tabs trạng thái */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setTabTrangThai('CHUA_DUYET')}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #f59e0b',
+                  backgroundColor: tabTrangThai === 'CHUA_DUYET' ? '#fef3c7' : '#fff',
+                  color: '#b45309',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                ⏳ CHƯA DUYỆT ({soLuongChuaDuyet})
+              </button>
+              <button
+                onClick={() => setTabTrangThai('DA_DUYET')}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #10b981',
+                  backgroundColor: tabTrangThai === 'DA_DUYET' ? '#d1fae5' : '#fff',
+                  color: '#047857',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                ✅ ĐÃ DUYỆT ({soLuongDaDuyet})
+              </button>
+              <button
+                onClick={() => setTabTrangThai('TAT_CA')}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: tabTrangThai === 'TAT_CA' ? '#e2e8f0' : '#fff',
+                  color: '#334155',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                📋 TẤT CẢ ({dsTheoQuyen.length})
+              </button>
+            </div>
 
-      {/* Bảng danh sách đơn hoa */}
-      <div style={{ backgroundColor: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f1f5f9', color: '#334155', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-              <th style={{ padding: '12px' }}>Dấu thời gian</th>
-              <th style={{ padding: '12px' }}>Tư vấn bán hàng</th>
-              <th style={{ padding: '12px' }}>Phòng KD</th>
-              <th style={{ padding: '12px' }}>Tên khách hàng</th>
-              <th style={{ padding: '12px' }}>Hợp đồng số</th>
-              <th style={{ padding: '12px' }}>Số VIN/Biển số</th>
-              <th style={{ padding: '12px' }}>Ngày/giờ giao xe</th>
-              <th style={{ padding: '12px' }}>Ảnh / Ghi chú</th>
-              <th style={{ padding: '12px' }}>Trạng thái / Duyệt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                  Đang tải danh sách đặt hoa...
-                </td>
-              </tr>
-            ) : dsHienThi.length === 0 ? (
-              <tr>
-                <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                  Không có dữ liệu phù hợp.
-                </td>
-              </tr>
-            ) : (
-              dsHienThi.map((row) => (
-                <tr key={row.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                    {new Date(row.dau_thoi_gian).toLocaleString('vi-VN')}
-                    {row.dat_sau_16h30 && (
-                      <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold' }}>⚠️ Sau 16h30</div>
-                    )}
-                  </td>
-                  <td style={{ padding: '12px', fontWeight: '600' }}>{row.tu_van_ban_hang}</td>
-                  <td style={{ padding: '12px' }}>
-                    <span style={{ padding: '3px 8px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
-                      {row.phong_kinh_doanh || '---'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{row.ten_khach_hang}</td>
-                  <td style={{ padding: '12px' }}>{row.hop_dong_so}</td>
-                  <td style={{ padding: '12px' }}>{row.so_vin_bien_so || '---'}</td>
-                  <td style={{ padding: '12px', fontWeight: '600', color: '#0284c7' }}>
-                    {new Date(row.ngay_gio_giao_xe).toLocaleString('vi-VN')}
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    {row.hinh_anh_url && (
-                      <a href={row.hinh_anh_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginBottom: '4px', color: '#0284c7', fontWeight: 'bold', fontSize: '12px' }}>
-                        🖼️ Xem ảnh đính kèm
-                      </a>
-                    )}
-                    <div style={{ color: '#475569', fontSize: '12px' }}>{row.ghi_chu || '---'}</div>
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    {row.trang_thai === 'CHUA_DUYET' ? (
-                      coQuyenDuyetDon(row) ? (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleXuLyDuyet(row, 'DA_DUYET')}
-                            style={{ padding: '6px 10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                          >
-                            ✓ Duyệt
-                          </button>
-                          <button
-                            onClick={() => handleXuLyDuyet(row, 'TU_CHOI')}
-                            style={{ padding: '6px 10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                          >
-                            ✕ Từ chối
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#d97706', fontWeight: 'bold', fontSize: '12px' }}>
-                          ⏳ Chờ PGĐ {row.phong_kinh_doanh} duyệt
-                        </span>
-                      )
-                    ) : row.trang_thai === 'DA_DUYET' ? (
-                      <div>
-                        <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '12px' }}>✅ Đã duyệt</span>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>Bởi: {row.nguoi_duyet}</div>
-                      </div>
-                    ) : (
-                      <div>
-                        <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '12px' }}>❌ Từ chối</span>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{row.ly_do_tu_choi}</div>
-                      </div>
-                    )}
-                  </td>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="🔍 Tìm KH, Số HĐ, TVBH, Biển số..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', width: '250px', backgroundColor: '#fff' }}
+              />
+              {coQuyenTaoPhieu && (
+                <button
+                  onClick={handleOpenForm}
+                  style={{
+                    padding: '9px 16px',
+                    backgroundColor: '#0284c7',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  + Tạo Phiếu Đặt Hoa
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Bảng danh sách đơn hoa */}
+          <div style={{ backgroundColor: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', color: '#334155', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                  <th style={{ padding: '12px' }}>Dấu thời gian</th>
+                  <th style={{ padding: '12px' }}>Tư vấn bán hàng</th>
+                  <th style={{ padding: '12px' }}>Phòng KD</th>
+                  <th style={{ padding: '12px' }}>Tên khách hàng</th>
+                  <th style={{ padding: '12px' }}>Hợp đồng số</th>
+                  <th style={{ padding: '12px' }}>Số VIN/Biển số</th>
+                  <th style={{ padding: '12px' }}>Ngày/giờ giao xe</th>
+                  <th style={{ padding: '12px' }}>Ảnh / Ghi chú</th>
+                  <th style={{ padding: '12px' }}>Trạng thái / Duyệt</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                      Đang tải danh sách đặt hoa...
+                    </td>
+                  </tr>
+                ) : dsHienThi.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                      Không có dữ liệu phù hợp.
+                    </td>
+                  </tr>
+                ) : (
+                  dsHienThi.map((row) => (
+                    <tr key={row.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        {new Date(row.dau_thoi_gian).toLocaleString('vi-VN')}
+                        {row.dat_sau_16h30 && (
+                          <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold' }}>⚠️ Sau 16h30</div>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: '600' }}>{row.tu_van_ban_hang}</td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ padding: '3px 8px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                          {row.phong_kinh_doanh || '---'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{row.ten_khach_hang}</td>
+                      <td style={{ padding: '12px' }}>{row.hop_dong_so}</td>
+                      <td style={{ padding: '12px' }}>{row.so_vin_bien_so || '---'}</td>
+                      <td style={{ padding: '12px', fontWeight: '600', color: '#0284c7' }}>
+                        {new Date(row.ngay_gio_giao_xe).toLocaleString('vi-VN')}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {row.hinh_anh_url && (
+                          <a href={row.hinh_anh_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginBottom: '4px', color: '#0284c7', fontWeight: 'bold', fontSize: '12px' }}>
+                            🖼️ Xem ảnh đính kèm
+                          </a>
+                        )}
+                        <div style={{ color: '#475569', fontSize: '12px' }}>{row.ghi_chu || '---'}</div>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {row.trang_thai === 'CHUA_DUYET' ? (
+                          coQuyenDuyetDon(row) ? (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                onClick={() => handleXuLyDuyet(row, 'DA_DUYET')}
+                                style={{ padding: '6px 10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                              >
+                                ✓ Duyệt
+                              </button>
+                              <button
+                                onClick={() => handleXuLyDuyet(row, 'TU_CHOI')}
+                                style={{ padding: '6px 10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                              >
+                                ✕ Từ chối
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#d97706', fontWeight: 'bold', fontSize: '12px' }}>
+                              ⏳ Chờ PGĐ {row.phong_kinh_doanh} duyệt
+                            </span>
+                          )
+                        ) : row.trang_thai === 'DA_DUYET' ? (
+                          <div>
+                            <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '12px' }}>✅ Đã duyệt</span>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Bởi: {row.nguoi_duyet}</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '12px' }}>❌ Từ chối</span>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{row.ly_do_tu_choi}</div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
-      {/* MODAL / DRAWER FORM ĐẶT HOA GIỐNG MẪU APPSHEET */}
+      {/* ===================================================================== */}
+      {/* NỘI DUNG 2: BÁO CÁO ĐẶT HOA                                           */}
+      {/* ===================================================================== */}
+      {mainTab === 'BAO_CAO' && (
+        <>
+          {/* Thanh Bộ Lọc Báo Cáo */}
+          <div
+            style={{
+              backgroundColor: '#fff',
+              padding: '14px 16px',
+              borderRadius: '10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              gap: '14px',
+              marginBottom: '18px',
+            }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'flex-end' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                  Từ ngày
+                </label>
+                <input
+                  type="date"
+                  value={tuNgay}
+                  onChange={(e) => setTuNgay(e.target.value)}
+                  style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                  Đến ngày
+                </label>
+                <input
+                  type="date"
+                  value={denNgay}
+                  onChange={(e) => setDenNgay(e.target.value)}
+                  style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+
+              {isToanQuyen && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                    Phòng Kinh Doanh
+                  </label>
+                  <select
+                    value={chonPhongBC}
+                    onChange={(e) => setChonPhongBC(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
+                  >
+                    <option value="TAT_CA">-- Tất cả phòng --</option>
+                    <option value="Kinh doanh 1">Kinh doanh 1</option>
+                    <option value="Kinh doanh 2">Kinh doanh 2</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                  Trạng thái duyệt
+                </label>
+                <select
+                  value={chonTrangThaiBC}
+                  onChange={(e) => setChonTrangThaiBC(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
+                >
+                  <option value="TAT_CA">-- Tất cả trạng thái --</option>
+                  <option value="DA_DUYET">✅ Đã duyệt</option>
+                  <option value="CHUA_DUYET">⏳ Chưa duyệt</option>
+                  <option value="TU_CHOI">❌ Từ chối</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              onClick={handleExportCSV}
+              style={{
+                padding: '9px 16px',
+                backgroundColor: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              📥 Xuất Excel (CSV)
+            </button>
+          </div>
+
+          {/* 5 Thẻ KPI Tổng Quan */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '14px',
+              marginBottom: '20px',
+            }}
+          >
+            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>TỔNG PHIẾU ĐẶT HOA</div>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#0f172a', marginTop: '4px' }}>{bcTongDon}</div>
+            </div>
+
+            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>ĐÃ DUYỆT CẤP HOA</div>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#16a34a', marginTop: '4px' }}>{bcDaDuyet}</div>
+            </div>
+
+            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>ĐANG CHỜ DUYỆT</div>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#d97706', marginTop: '4px' }}>{bcChuaDuyet}</div>
+            </div>
+
+            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>TỪ CHỐI</div>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#dc2626', marginTop: '4px' }}>{bcTuChoi}</div>
+            </div>
+
+            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #9333ea', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>ĐẶT SAU 16H30</div>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#7e22ce', marginTop: '4px' }}>{bcSau1630}</div>
+            </div>
+          </div>
+
+          {/* 2 Bảng Tổng Hợp Theo Phòng KD & Theo TVBH */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+            {/* Bảng Tổng hợp theo Phòng Kinh Doanh */}
+            <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#0f172a' }}>🏢 Tổng hợp theo Phòng Kinh Doanh</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '8px' }}>Phòng KD</th>
+                    <th style={{ padding: '8px', textAlign: 'center' }}>Tổng</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Đã duyệt</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>Chờ</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>Sau 16h30</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(thongKePhongMap).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '14px', textAlign: 'center', color: '#94a3b8' }}>Chưa có dữ liệu</td>
+                    </tr>
+                  ) : (
+                    Object.entries(thongKePhongMap).map(([phong, st]) => (
+                      <tr key={phong} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px', fontWeight: 'bold' }}>{phong}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{st.tong}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', color: '#16a34a', fontWeight: '600' }}>{st.daDuyet}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>{st.chuaDuyet}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>{st.tre1630}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Bảng Thống kê theo Tư vấn bán hàng */}
+            <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxHeight: '320px', overflowY: 'auto' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#0f172a' }}>👨‍💼 Thống kê theo Tư vấn bán hàng</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '8px' }}>Tư vấn bán hàng</th>
+                    <th style={{ padding: '8px' }}>Phòng</th>
+                    <th style={{ padding: '8px', textAlign: 'center' }}>Tổng</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Đã duyệt</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>Sau 16h30</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dsThongKeTVBH.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '14px', textAlign: 'center', color: '#94a3b8' }}>Chưa có dữ liệu</td>
+                    </tr>
+                  ) : (
+                    dsThongKeTVBH.map((tv) => (
+                      <tr key={tv.ten} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px', fontWeight: '600' }}>{tv.ten}</td>
+                        <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>{tv.phong}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{tv.tong}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', color: '#16a34a', fontWeight: '600' }}>{tv.daDuyet}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>{tv.tre1630}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Bảng kê chi tiết */}
+          <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#0f172a' }}>
+              📋 Bảng kê chi tiết đơn đặt hoa ({duLieuBaoCao.length} phiếu)
+            </h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                  <th style={{ padding: '10px' }}>STT</th>
+                  <th style={{ padding: '10px' }}>Thời gian đặt</th>
+                  <th style={{ padding: '10px' }}>Phòng KD</th>
+                  <th style={{ padding: '10px' }}>TVBH</th>
+                  <th style={{ padding: '10px' }}>Khách hàng</th>
+                  <th style={{ padding: '10px' }}>Số HĐ</th>
+                  <th style={{ padding: '10px' }}>VIN / Biển số</th>
+                  <th style={{ padding: '10px' }}>Giờ giao xe</th>
+                  <th style={{ padding: '10px' }}>Trạng thái</th>
+                  <th style={{ padding: '10px' }}>Người duyệt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Đang tải báo cáo...</td>
+                  </tr>
+                ) : duLieuBaoCao.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Không có dữ liệu trong kỳ báo cáo.</td>
+                  </tr>
+                ) : (
+                  duLieuBaoCao.map((row, index) => (
+                    <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px' }}>{index + 1}</td>
+                      <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                        {new Date(row.dau_thoi_gian).toLocaleString('vi-VN')}
+                        {row.dat_sau_16h30 && (
+                          <span style={{ marginLeft: '6px', fontSize: '10px', backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 5px', borderRadius: '4px', fontWeight: 'bold' }}>
+                            Sau 16h30
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px' }}>{row.phong_kinh_doanh}</td>
+                      <td style={{ padding: '10px', fontWeight: '600' }}>{row.tu_van_ban_hang}</td>
+                      <td style={{ padding: '10px', fontWeight: 'bold' }}>{row.ten_khach_hang}</td>
+                      <td style={{ padding: '10px' }}>{row.hop_dong_so}</td>
+                      <td style={{ padding: '10px' }}>{row.so_vin_bien_so || '---'}</td>
+                      <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                        {new Date(row.ngay_gio_giao_xe).toLocaleString('vi-VN')}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        {row.trang_thai === 'DA_DUYET' ? (
+                          <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✅ Đã duyệt</span>
+                        ) : row.trang_thai === 'TU_CHOI' ? (
+                          <span style={{ color: '#dc2626', fontWeight: 'bold' }}>❌ Từ chối</span>
+                        ) : (
+                          <span style={{ color: '#d97706', fontWeight: 'bold' }}>⏳ Chờ duyệt</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px', fontSize: '12px', color: '#475569' }}>{row.nguoi_duyet || '---'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL FORM ĐẶT HOA                                                    */}
+      {/* ===================================================================== */}
       {modalOpen && (
         <div
           style={{
@@ -652,7 +1086,6 @@ export default function QuanLyDatHoaPage() {
               boxShadow: '-10px 0 25px rgba(0,0,0,0.15)',
             }}
           >
-            {/* Header giống AppSheet */}
             <div
               style={{
                 padding: '14px 20px',
@@ -692,9 +1125,7 @@ export default function QuanLyDatHoaPage() {
               </div>
             </div>
 
-            {/* Body Form */}
             <form id="formDatHoa" onSubmit={handleSubmit} style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-              {/* Cảnh báo nếu đặt sau 16h30 */}
               {isAfter1630 && (
                 <div style={{ padding: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '16px', color: '#b91c1c', fontSize: '13px' }}>
                   🚨 <b>Đã qua 16h30:</b> Vui lòng chụp hoặc tải lên hình ảnh xác nhận xe/hợp đồng bên dưới để được duyệt đơn hoa!
@@ -825,7 +1256,7 @@ export default function QuanLyDatHoaPage() {
                 />
               </div>
 
-              {/* Chụp hình gửi nếu đặt sau 16h30 (hoặc đính kèm tự nguyện trước 16h30) */}
+              {/* Chụp hình gửi nếu đặt sau 16h30 */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: isAfter1630 ? '#dc2626' : '#475569', marginBottom: '6px' }}>
                   📷 Chụp hình / Tải ảnh xác nhận {isAfter1630 && <span style={{ color: '#ef4444' }}>* (Bắt buộc sau 16h30)</span>}
