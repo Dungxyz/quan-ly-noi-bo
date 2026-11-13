@@ -53,18 +53,19 @@ export default function QuanLyDatHoaPage() {
   async function loadData() {
     setLoading(true);
     try {
-      // 1. Lấy toàn bộ nhân sự (tránh bị .neq loại mất các dòng có phan_quyen là NULL)
+      // 1. Lấy toàn bộ nhân sự từ bảng nhan_vien
       const { data: nvData, error: nvError } = await supabase
         .from('nhan_vien')
         .select('*')
         .order('ma_nv', { ascending: true });
 
       if (nvError) {
+        alert('❌ Lỗi truy vấn bảng nhan_vien: ' + nvError.message);
         console.error('Lỗi tải bảng nhan_vien:', nvError);
       }
 
-      if (nvData) {
-        // Chỉ giữ nhân viên chưa bị khóa (LOCKED) và chưa nghỉ việc
+      if (nvData && nvData.length > 0) {
+        // Lọc bỏ tài khoản bị khóa (LOCKED)
         const nvHoatDong = nvData.filter(
           (nv) =>
             nv.phan_quyen !== 'LOCKED' &&
@@ -72,27 +73,40 @@ export default function QuanLyDatHoaPage() {
             nv.tinh_trang !== 'Đã nghỉ việc'
         );
 
-        // Lọc đúng Vị trí là "Tư vấn bán hàng" (hoặc viết tắt TVBH)
+        // Quét tất cả giá trị trong dòng nhân viên để tìm người có vị trí "Tư vấn bán hàng"
         const tvbhList = nvHoatDong.filter((nv) => {
-          const viTri = (nv.vi_tri || nv.chuc_vu || '').toLowerCase().trim();
-          return viTri.includes('tư vấn bán hàng') || viTri === 'tvbh';
+          const allText = Object.values(nv)
+            .filter((val) => typeof val === 'string')
+            .join(' ')
+            .toLowerCase();
+          return allText.includes('tư vấn bán hàng') || allText.includes('tvbh');
         });
 
-        // Nếu lọc theo vị trí vẫn trống thì fallback lấy theo bộ phận Kinh doanh để không bao giờ bị rỗng dropdown
-        setDanhSachTVBH(
+        // Nếu không tìm thấy chữ "tư vấn bán hàng", lấy tất cả nhân viên bộ phận Kinh doanh
+        const dsCuoiCung =
           tvbhList.length > 0
             ? tvbhList
-            : nvHoatDong.filter((nv) =>
-                (nv.bo_phan || nv.phong_ban || '').toLowerCase().includes('kinh doanh')
-              )
-        );
+            : nvHoatDong.filter((nv) => {
+                const allText = Object.values(nv)
+                  .filter((val) => typeof val === 'string')
+                  .join(' ')
+                  .toLowerCase();
+                return allText.includes('kinh doanh');
+              });
+
+        setDanhSachTVBH(dsCuoiCung.length > 0 ? dsCuoiCung : nvHoatDong);
 
         // Lọc Phó giám đốc kinh doanh (2 phòng)
         const pgdList = nvHoatDong.filter((nv) => {
-          const vt = (nv.vi_tri || nv.chuc_vu || '').toLowerCase();
-          return vt.includes('phó giám đốc') || vt.includes('pgđ');
+          const allText = Object.values(nv)
+            .filter((val) => typeof val === 'string')
+            .join(' ')
+            .toLowerCase();
+          return allText.includes('phó giám đốc') || allText.includes('pgđ');
         });
         setDanhSachPGD(pgdList);
+      } else {
+        console.warn('Bảng nhan_vien trả về rỗng (0 dòng). Kiểm tra lại RLS hoặc Supabase URL/Key.');
       }
 
       // 2. Lấy danh sách đơn đặt hoa
@@ -102,7 +116,7 @@ export default function QuanLyDatHoaPage() {
         .order('dau_thoi_gian', { ascending: false });
 
       if (hoaData) setDanhSachHoa(hoaData);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi tải dữ liệu đặt hoa:', err);
     } finally {
       setLoading(false);
