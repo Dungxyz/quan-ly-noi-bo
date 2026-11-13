@@ -1,39 +1,33 @@
 import { NextResponse } from 'next/server';
 
-// Cấu hình 6 Bot Zalo (3 Bot chính + 3 Bot dự phòng) khớp với 6 cột trong bảng nhan_vien
+// Cấu hình 6 Bot Zalo (3 Bot chính + 3 Bot dự phòng) đọc từ biến môi trường (.env.local / Vercel)
 const DANH_SACH_BOT = {
   BOT_1: {
-    // Bot 1: HCNS / Tài khoản / Đặt hoa
-    url: 'https://bot-api.zaloplatforms.com/bot2842067600454710958:pqPyfvdqzGuNKTaOhCWadVaLzhWflFoYRFwEigLNALpHrhFKPHqiPdEZlvzoqtmE/sendMessage',
-    groupId: '6d6fb4ffc0b229ec70a3',
+    url: process.env.ZALO_BOT_1_URL || '',
+    groupId: process.env.ZALO_GROUP_1_ID || '',
     cotChatId: 'id_doan_chat_bot',
   },
   BOT_2: {
-    // Bot 2: Tiếp nhận xe dịch vụ
-    url: 'https://bot-api.zaloplatforms.com/bot2285270167614082446:uxQHphWWbHWiPXacUulMXuZzAiiNmSDSkqwbEsvllXjvkqPcyKkrRrWAnHOkYKGV/sendMessage',
-    groupId: '4a5293c2e78f0ed1579e',
+    url: process.env.ZALO_BOT_2_URL || '',
+    groupId: process.env.ZALO_GROUP_2_ID || '',
     cotChatId: 'id_doan_chat_bot_2',
   },
   BOT_3: {
-    // Bot 3 (Chính 3 - Điền URL khi kích hoạt)
     url: process.env.ZALO_BOT_3_URL || '',
     groupId: process.env.ZALO_GROUP_3_ID || '',
     cotChatId: 'id_doan_chat_bot_3',
   },
   BOT_4: {
-    // Bot 4 (Dự phòng 1)
     url: process.env.ZALO_BOT_4_URL || '',
     groupId: process.env.ZALO_GROUP_4_ID || '',
     cotChatId: 'id_doan_chat_bot_4',
   },
   BOT_5: {
-    // Bot 5 (Dự phòng 2)
     url: process.env.ZALO_BOT_5_URL || '',
     groupId: process.env.ZALO_GROUP_5_ID || '',
     cotChatId: 'id_doan_chat_bot_5',
   },
   BOT_6: {
-    // Bot 6 (Dự phòng 3)
     url: process.env.ZALO_BOT_6_URL || '',
     groupId: process.env.ZALO_GROUP_6_ID || '',
     cotChatId: 'id_doan_chat_bot_6',
@@ -71,6 +65,13 @@ export async function POST(req: Request) {
         return NextResponse.json({
           success: false,
           message: 'Nhân viên chưa có ID Zalo Bot',
+        });
+      }
+
+      if (!DANH_SACH_BOT.BOT_1.url) {
+        return NextResponse.json({
+          success: false,
+          message: 'Chưa cấu hình ZALO_BOT_1_URL trong biến môi trường',
         });
       }
 
@@ -115,6 +116,13 @@ export async function POST(req: Request) {
         return NextResponse.json({
           success: false,
           message: 'Vui lòng nhập ID đoạn chat Zalo nhận!',
+        });
+      }
+
+      if (!DANH_SACH_BOT.BOT_1.url) {
+        return NextResponse.json({
+          success: false,
+          message: 'Chưa cấu hình ZALO_BOT_1_URL trong biến môi trường',
         });
       }
 
@@ -165,6 +173,13 @@ export async function POST(req: Request) {
         chat_id_pgd,
       } = body;
 
+      if (!DANH_SACH_BOT.BOT_1.url) {
+        return NextResponse.json({
+          success: false,
+          message: 'Chưa cấu hình ZALO_BOT_1_URL trong biến môi trường',
+        });
+      }
+
       let noiDungHoa = '';
 
       if (hanh_dong === 'TAO_MOI') {
@@ -199,7 +214,10 @@ export async function POST(req: Request) {
 ⚠️ Lý do: ${ly_do_tu_choi || 'Không đạt điều kiện'}`;
       }
 
-      const danhSachNhan = new Set<string>([DANH_SACH_BOT.BOT_1.groupId]);
+      const danhSachNhan = new Set<string>();
+      if (DANH_SACH_BOT.BOT_1.groupId) {
+        danhSachNhan.add(DANH_SACH_BOT.BOT_1.groupId.trim());
+      }
       if (chat_id_pgd && String(chat_id_pgd).trim()) {
         danhSachNhan.add(String(chat_id_pgd).trim());
       }
@@ -237,6 +255,14 @@ export async function POST(req: Request) {
       co_van_cu,
     } = body;
 
+    const botTiepNhan = DANH_SACH_BOT.BOT_2;
+    if (!botTiepNhan.url) {
+      return NextResponse.json({
+        success: false,
+        message: 'Chưa cấu hình ZALO_BOT_2_URL trong biến môi trường',
+      });
+    }
+
     // Chống gọi API 2 lần liên tiếp cho cùng 1 xe + cố vấn trong 5 giây
     const cacheKey = `${bien_so}_${co_van_vien}_${co_van_cu || ''}`;
     const nowMs = Date.now();
@@ -269,12 +295,11 @@ export async function POST(req: Request) {
 📝 Ghi chú: ${ghi_chu || 'Không có'}
 ⏰ Thời gian: ${thoiGianStr}`;
 
-    // Gom danh sách người nhận của Bot 2: Nhóm Dịch vụ (4a5293c2e78f0ed1579e) + ID Bot 2 của Cố vấn
-    const botTiepNhan = DANH_SACH_BOT.BOT_2;
     const cleanGroupId = String(botTiepNhan.groupId).trim();
     const cleanCvId = chat_id ? String(chat_id).trim() : '';
 
-    const danhSachNhan = new Set<string>([cleanGroupId]);
+    const danhSachNhan = new Set<string>();
+    if (cleanGroupId) danhSachNhan.add(cleanGroupId);
     if (cleanCvId && cleanCvId !== cleanGroupId) {
       danhSachNhan.add(cleanCvId);
     }
