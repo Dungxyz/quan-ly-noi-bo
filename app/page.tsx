@@ -465,7 +465,7 @@ export default function NhanSuPage() {
           </h1>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', padding: '12px 24px 0 24px', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', gap: '8px', padding: '12px 24px 0 24px', borderBottom: '1px solid #e2e8f0', overflowX: 'auto', whiteSpace: 'nowrap',}}>
           <a
             href="/"
             style={{
@@ -708,7 +708,7 @@ export default function NhanSuPage() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
                     Loại tài khoản <span style={{ color: '#ef4444' }}>*</span>
