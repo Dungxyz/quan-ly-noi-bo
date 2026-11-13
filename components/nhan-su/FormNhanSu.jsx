@@ -358,15 +358,6 @@ export default function FormNhanSu({
             />
           </div>
           <div>
-            <label style={labelStyle}>ID chat BOT</label>
-            <input
-              type="text"
-              value={formData.id_doan_chat_bot}
-              onChange={(e) => setFormData({ ...formData, id_doan_chat_bot: e.target.value })}
-              style={responsiveInputStyle}
-            />
-          </div>
-          <div style={{ gridColumn: isMobile ? 'span 2' : 'span 2' }}>
             <label style={labelStyle}>Tình trạng công tác</label>
             <select
               value={formData.trang_thai || 'Hoạt động'}
@@ -380,6 +371,94 @@ export default function FormNhanSu({
               <option value="Hoạt động">🟢 Đang làm việc (Hoạt động)</option>
               <option value="Đã nghỉ việc">🔴 Đã nghỉ việc (Ngưng hoạt động)</option>
             </select>
+          </div>
+
+          {/* CỤM 6 ID CHAT ZALO BOT (3 BOT CHÍNH + 3 BOT DỰ PHÒNG) */}
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              borderTop: '1px dashed #cbd5e1',
+              paddingTop: '14px',
+              marginTop: '4px',
+            }}
+          >
+            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: '10px' }}>
+              🤖 DANH SÁCH ID CHAT ZALO BOT (3 BOT CHÍNH & 3 BOT DỰ PHÒNG)
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+                gap: isMobile ? '10px' : '14px',
+              }}
+            >
+              <div>
+                <label style={labelStyle}>ID Bot 1 (Chính - HCNS)</label>
+                <input
+                  type="text"
+                  placeholder="Chat ID Bot 1..."
+                  value={formData.id_doan_chat_bot || ''}
+                  onChange={(e) => setFormData({ ...formData, id_doan_chat_bot: e.target.value.trim() })}
+                  style={responsiveInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>ID Bot 2 (Chính - Dịch vụ)</label>
+                <input
+                  type="text"
+                  placeholder="Chat ID Bot 2..."
+                  value={formData.id_doan_chat_bot_2 || ''}
+                  onChange={(e) => setFormData({ ...formData, id_doan_chat_bot_2: e.target.value.trim() })}
+                  style={responsiveInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>ID Bot 3 (Chính - Đặt hoa)</label>
+                <input
+                  type="text"
+                  placeholder="Chat ID Bot 3..."
+                  value={formData.id_doan_chat_bot_3 || ''}
+                  onChange={(e) => setFormData({ ...formData, id_doan_chat_bot_3: e.target.value.trim() })}
+                  style={responsiveInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>ID Bot 4 (Dự phòng 1)</label>
+                <input
+                  type="text"
+                  placeholder="Chat ID Bot 4..."
+                  value={formData.id_doan_chat_bot_4 || ''}
+                  onChange={(e) => setFormData({ ...formData, id_doan_chat_bot_4: e.target.value.trim() })}
+                  style={responsiveInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>ID Bot 5 (Dự phòng 2)</label>
+                <input
+                  type="text"
+                  placeholder="Chat ID Bot 5..."
+                  value={formData.id_doan_chat_bot_5 || ''}
+                  onChange={(e) => setFormData({ ...formData, id_doan_chat_bot_5: e.target.value.trim() })}
+                  style={responsiveInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>ID Bot 6 (Dự phòng 3)</label>
+                <input
+                  type="text"
+                  placeholder="Chat ID Bot 6..."
+                  value={formData.id_doan_chat_bot_6 || ''}
+                  onChange={(e) => setFormData({ ...formData, id_doan_chat_bot_6: e.target.value.trim() })}
+                  style={responsiveInputStyle}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

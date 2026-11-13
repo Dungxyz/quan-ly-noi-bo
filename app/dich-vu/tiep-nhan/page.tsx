@@ -49,7 +49,7 @@ export default function TiepNhanXePage() {
       return (ma && searchStr.includes(ma)) || (ten && searchStr.includes(ten));
     });
     if (!cvObj) return '';
-    return cvObj.uid_zalo || cvObj.id_doan_chat_bot || '';
+    return cvObj.id_doan_chat_bot_2 || '';
   }
 
   // Form state
@@ -68,7 +68,7 @@ export default function TiepNhanXePage() {
     try {
       const { data: cvData } = await supabase
         .from('nhan_vien')
-        .select('ma_nv, ho_ten, bo_phan, vi_tri, id_doan_chat_bot')
+        .select('ma_nv, ho_ten, bo_phan, vi_tri, id_doan_chat_bot_2')
         .or('bo_phan.eq.CVDV,vi_tri.ilike.%CVDV%,bo_phan.ilike.%Cố vấn%')
         .order('ma_nv', { ascending: true });
 
@@ -77,7 +77,7 @@ export default function TiepNhanXePage() {
       } else {
         const { data: allNv } = await supabase
           .from('nhan_vien')
-          .select('ma_nv, ho_ten, id_doan_chat_bot')
+          .select('ma_nv, ho_ten, id_doan_chat_bot_2')
           .order('ma_nv', { ascending: true });
         if (allNv) setDanhSachCoVan(allNv);
       }

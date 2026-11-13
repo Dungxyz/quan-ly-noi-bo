@@ -1,7 +1,44 @@
 import { NextResponse } from 'next/server';
 
-const ZALO_BOT_URL = 'https://bot-api.zaloplatforms.com/bot2842067600454710958:pqPyfvdqzGuNKTaOhCWadVaLzhWflFoYRFwEigLNALpHrhFKPHqiPdEZlvzoqtmE/sendMessage';
-const DEFAULT_GROUP_ID = '6d6fb4ffc0b229ec70a3';
+// Cấu hình 6 Bot Zalo (3 Bot chính + 3 Bot dự phòng) khớp với 6 cột trong bảng nhan_vien
+const DANH_SACH_BOT = {
+  BOT_1: {
+    // Bot 1: HCNS / Tài khoản / Đặt hoa
+    url: 'https://bot-api.zaloplatforms.com/bot2842067600454710958:pqPyfvdqzGuNKTaOhCWadVaLzhWflFoYRFwEigLNALpHrhFKPHqiPdEZlvzoqtmE/sendMessage',
+    groupId: '6d6fb4ffc0b229ec70a3',
+    cotChatId: 'id_doan_chat_bot',
+  },
+  BOT_2: {
+    // Bot 2: Tiếp nhận xe dịch vụ
+    url: 'https://bot-api.zaloplatforms.com/bot2285270167614082446:uxQHphWWbHWiPXacUulMXuZzAiiNmSDSkqwbEsvllXjvkqPcyKkrRrWAnHOkYKGV/sendMessage',
+    groupId: '4a5293c2e78f0ed1579e',
+    cotChatId: 'id_doan_chat_bot_2',
+  },
+  BOT_3: {
+    // Bot 3 (Chính 3 - Điền URL khi kích hoạt)
+    url: process.env.ZALO_BOT_3_URL || '',
+    groupId: process.env.ZALO_GROUP_3_ID || '',
+    cotChatId: 'id_doan_chat_bot_3',
+  },
+  BOT_4: {
+    // Bot 4 (Dự phòng 1)
+    url: process.env.ZALO_BOT_4_URL || '',
+    groupId: process.env.ZALO_GROUP_4_ID || '',
+    cotChatId: 'id_doan_chat_bot_4',
+  },
+  BOT_5: {
+    // Bot 5 (Dự phòng 2)
+    url: process.env.ZALO_BOT_5_URL || '',
+    groupId: process.env.ZALO_GROUP_5_ID || '',
+    cotChatId: 'id_doan_chat_bot_5',
+  },
+  BOT_6: {
+    // Bot 6 (Dự phòng 3)
+    url: process.env.ZALO_BOT_6_URL || '',
+    groupId: process.env.ZALO_GROUP_6_ID || '',
+    cotChatId: 'id_doan_chat_bot_6',
+  },
+};
 
 // Bộ nhớ đệm chống gửi đúp cùng 1 biển số trong vòng 5 giây
 const recentSentCache = new Map<string, number>();
@@ -24,7 +61,7 @@ export async function POST(req: Request) {
       vnTime.toLocaleDateString('vi-VN');
 
     // =========================================================================
-    // 1. NHÁNH GỬI THÔNG BÁO CẤP / ĐỔI MẬT KHẨU (GỬI RIÊNG CHO NHÂN VIÊN THEO UID)
+    // 1. NHÁNH GỬI THÔNG BÁO CẤP / ĐỔI MẬT KHẨU (DÙNG BOT 1)
     // =========================================================================
     if (body.type === 'DOI_MAT_KHAU') {
       const { ma_nv, ho_ten, mat_khau_moi, chat_id } = body;
@@ -44,7 +81,7 @@ export async function POST(req: Request) {
 ⏰ Thời gian: ${thoiGianStr}
 ⚠️ Vui lòng đăng nhập và bảo mật thông tin tài khoản.`;
 
-      const res = await fetch(ZALO_BOT_URL, {
+      const res = await fetch(DANH_SACH_BOT.BOT_1.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -59,7 +96,7 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
-    // 2. NHÁNH GỬI THÔNG BÁO THÔNG TIN TÀI KHOẢN QUA ZALO
+    // 2. NHÁNH GỬI THÔNG BÁO THÔNG TIN TÀI KHOẢN QUA ZALO (DÙNG BOT 1)
     // =========================================================================
     if (body.type === 'GUI_TAI_KHOAN') {
       const {
@@ -90,7 +127,7 @@ export async function POST(req: Request) {
 ⏰ Thời gian cấp: ${thoiGianStr}
 ⚠️ Vui lòng đăng nhập và bảo mật thông tin tài khoản.`;
 
-      const res = await fetch(ZALO_BOT_URL, {
+      const res = await fetch(DANH_SACH_BOT.BOT_1.url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,11 +145,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-    //4. NHÁNH GỬI THÔNG BÁO ĐẶT HOA GIAO XE (TẠO ĐƠN MỚI & DUYỆT ĐƠN)
+    // =========================================================================
+    // 3. NHÁNH GỬI THÔNG BÁO ĐẶT HOA GIAO XE (DÙNG BOT 1)
     // =========================================================================
     if (body.type === 'DAT_HOA') {
       const {
-        hanh_dong, // 'TAO_MOI' | 'DUYET_DON' | 'TU_CHOI'
+        hanh_dong,
         tu_van_ban_hang,
         phong_kinh_doanh,
         ten_khach_hang,
@@ -124,7 +162,7 @@ export async function POST(req: Request) {
         hinh_anh_url,
         nguoi_duyet,
         ly_do_tu_choi,
-        chat_id_pgd, // UID Zalo Bot của Phó GĐ Kinh Doanh phụ trách phòng đó
+        chat_id_pgd,
       } = body;
 
       let noiDungHoa = '';
@@ -161,15 +199,14 @@ export async function POST(req: Request) {
 ⚠️ Lý do: ${ly_do_tu_choi || 'Không đạt điều kiện'}`;
       }
 
-      // Gửi vào nhóm chung + gửi riêng cho Phó GĐKD của phòng kinh doanh đó
-      const danhSachNhan = new Set<string>([DEFAULT_GROUP_ID]);
+      const danhSachNhan = new Set<string>([DANH_SACH_BOT.BOT_1.groupId]);
       if (chat_id_pgd && String(chat_id_pgd).trim()) {
         danhSachNhan.add(String(chat_id_pgd).trim());
       }
 
       const ketQua = await Promise.all(
         Array.from(danhSachNhan).map(async (targetId) => {
-          const res = await fetch(ZALO_BOT_URL, {
+          const res = await fetch(DANH_SACH_BOT.BOT_1.url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -186,7 +223,7 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
-    // 3. NHÁNH GỬI THÔNG BÁO TIẾP NHẬN / ĐIỀU CHUYỂN XE DỊCH VỤ
+    // 4. NHÁNH GỬI THÔNG BÁO TIẾP NHẬN / ĐIỀU CHUYỂN XE DỊCH VỤ (DÙNG BOT 2)
     // =========================================================================
     const {
       bien_so,
@@ -232,8 +269,9 @@ export async function POST(req: Request) {
 📝 Ghi chú: ${ghi_chu || 'Không có'}
 ⏰ Thời gian: ${thoiGianStr}`;
 
-    // Gom danh sách người nhận & loại bỏ trùng lặp tuyệt đối
-    const cleanGroupId = String(DEFAULT_GROUP_ID).trim();
+    // Gom danh sách người nhận của Bot 2: Nhóm Dịch vụ (4a5293c2e78f0ed1579e) + ID Bot 2 của Cố vấn
+    const botTiepNhan = DANH_SACH_BOT.BOT_2;
+    const cleanGroupId = String(botTiepNhan.groupId).trim();
     const cleanCvId = chat_id ? String(chat_id).trim() : '';
 
     const danhSachNhan = new Set<string>([cleanGroupId]);
@@ -241,10 +279,9 @@ export async function POST(req: Request) {
       danhSachNhan.add(cleanCvId);
     }
 
-    // Gửi mỗi nơi đúng 1 tin duy nhất
     const ketQua = await Promise.all(
       Array.from(danhSachNhan).map(async (targetId) => {
-        const res = await fetch(ZALO_BOT_URL, {
+        const res = await fetch(botTiepNhan.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -263,7 +300,4 @@ export async function POST(req: Request) {
     console.error('Lỗi API Zalo Bot:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-
-  
-
 }
