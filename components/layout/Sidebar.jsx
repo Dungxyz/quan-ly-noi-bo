@@ -47,6 +47,7 @@ export default function Sidebar({ isMobile = false, mobileOpen = false, onCloseM
       path: '/dat-hoa',
       moduleKey: 'DAT_HOA',
       moTa: 'Hoa bàn giao xe & duyệt chi',
+      isPublic: true,
     },
   ];
 
@@ -78,10 +79,10 @@ export default function Sidebar({ isMobile = false, mobileOpen = false, onCloseM
   }
 
   function checkQuyen(key, isPublic) {
-    if (isPublic) return true;
     if (!currentUser) return false;
     const role = currentUser.phan_quyen || '';
     if (role === 'LOCKED') return false;
+    if (isPublic) return true;
     if (role === 'ADMIN' || role === 'ALL') return true;
     if (role.includes(key)) return true;
     if (typeof kiemTraQuyen === 'function' && kiemTraQuyen(key)) return true;
