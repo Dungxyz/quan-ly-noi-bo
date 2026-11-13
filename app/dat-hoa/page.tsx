@@ -435,6 +435,11 @@ export default function QuanLyDatHoaPage() {
   });
 
   const soLuongChuaDuyet = dsTheoQuyen.filter((x) => x.trang_thai === 'CHUA_DUYET').length;
+  const soLuongDaDuyet = dsTheoQuyen.filter((x) => x.trang_thai === 'DA_DUYET').length;
+
+  // Phó Giám đốc Kinh doanh chỉ duyệt đơn, không hiển thị nút tạo phiếu đặt hoa
+  const { isPGDKD, isToanQuyen } = getVaiTroUser(currentUser);
+  const coQuyenTaoPhieu = isToanQuyen || !isPGDKD;
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Segoe UI, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
@@ -457,6 +462,7 @@ export default function QuanLyDatHoaPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', width: '250px' }}
           />
+          {coQuyenTaoPhieu && (
           <button
             onClick={handleOpenForm}
             style={{
@@ -471,7 +477,7 @@ export default function QuanLyDatHoaPage() {
             }}
           >
             + Tạo Phiếu Đặt Hoa
-          </button>
+          </button>)}
         </div>
       </div>
 
@@ -505,7 +511,7 @@ export default function QuanLyDatHoaPage() {
             cursor: 'pointer',
           }}
         >
-          ✅ ĐÃ DUYỆT
+          ✅ ĐÃ DUYỆT ({soLuongDaDuyet})
         </button>
         <button
           onClick={() => setTabTrangThai('TAT_CA')}
