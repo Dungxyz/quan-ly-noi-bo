@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/common/Toast';
 import { DANH_MUC_QUYEN, TAT_CA_MA_QUYEN, layBadgeQuyen } from '@/constants/quyenConfig';
@@ -15,6 +15,9 @@ interface NhanVienQuyen {
 }
 
 export default function PhanQuyenPage() {
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const formRef = useRef<HTMLDivElement>(null);
+
   const [danhSach, setDanhSach] = useState<NhanVienQuyen[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [tuKhoa, setTuKhoa] = useState<string>('');
@@ -40,6 +43,14 @@ export default function PhanQuyenPage() {
     nhom.danhSach.map((q: any) => q.id)
   );
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    layDanhSach();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   function baoTin(message: string, type: 'success' | 'error' | 'warning' = 'success') {
     setToast({ show: true, type, message });
     setTimeout(() => setToast({ show: false, type: 'success', message: '' }), 3500);
@@ -61,11 +72,7 @@ export default function PhanQuyenPage() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    layDanhSach();
-  }, []);
-
-  // 2. Khi click vào dòng nhân viên bên bảng phải
+  // 2. Khi click vào dòng nhân viên bên bảng phải / thẻ bên dưới
   function handleChonNhanVien(nv: NhanVienQuyen) {
     setNvDangChon(nv);
 
@@ -85,6 +92,11 @@ export default function PhanQuyenPage() {
       } else {
         setDsQuyenDaChon([]);
       }
+    }
+
+    // Trên mobile tự động cuộn mượt lên form cấp quyền để thao tác ngay
+    if (isMobile && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
@@ -114,7 +126,7 @@ export default function PhanQuyenPage() {
   async function handleLuuPhanQuyen(e: React.FormEvent) {
     e.preventDefault();
     if (!nvDangChon) {
-      return baoTin('Vui lòng bấm chọn một nhân viên từ danh sách bên phải!', 'warning');
+      return baoTin('Vui lòng bấm chọn một nhân viên từ danh sách!', 'warning');
     }
 
     setDangLuu(true);
@@ -184,22 +196,23 @@ export default function PhanQuyenPage() {
   return (
     <div
       style={{
-        padding: '24px',
+        padding: isMobile ? '14px 12px 24px 12px' : '24px',
         backgroundColor: '#f8fafc',
-        height: '100vh',
+        height: isMobile ? 'auto' : '100vh',
+        minHeight: '100vh',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        overflow: isMobile ? 'visible' : 'hidden',
       }}
     >
       <Toast toast={toast} onClose={() => setToast({ show: false, type: 'success', message: '' })} />
 
       {/* TIÊU ĐỀ TRANG */}
-      <div style={{ marginBottom: '20px', flexShrink: 0 }}>
+      <div style={{ marginBottom: isMobile ? '14px' : '20px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '20px' }}>🔐</span>
-          <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
+          <h1 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
             PHÂN QUYỀN TRUY CẬP TÀI KHOẢN
           </h1>
         </div>
@@ -208,27 +221,29 @@ export default function PhanQuyenPage() {
         </p>
       </div>
 
-      {/* BỐ CỤC 2 CỘT */}
+      {/* BỐ CỤC 2 CỘT (Desktop ngang / Mobile xếp dọc) */}
       <div
         style={{
           display: 'flex',
-          gap: '24px',
-          flex: 1,
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? '16px' : '24px',
+          flex: isMobile ? 'none' : 1,
           minHeight: 0,
           alignItems: 'stretch',
         }}
       >
         {/* CỘT TRÁI: FORM CẤP QUYỀN */}
         <div
+          ref={formRef}
           style={{
-            width: '380px',
+            width: isMobile ? '100%' : '380px',
             flexShrink: 0,
             backgroundColor: '#fff',
             borderRadius: '8px',
             border: '1px solid #e2e8f0',
-            padding: '20px',
+            padding: isMobile ? '16px 14px' : '20px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            overflowY: 'auto',
+            overflowY: isMobile ? 'visible' : 'auto',
             boxSizing: 'border-box',
           }}
         >
@@ -253,7 +268,13 @@ export default function PhanQuyenPage() {
               <input
                 type="text"
                 readOnly
-                value={nvDangChon ? `${nvDangChon.ma_nv} - ${nvDangChon.ho_ten}` : 'Bấm vào danh sách bên phải'}
+                value={
+                  nvDangChon
+                    ? `${nvDangChon.ma_nv} - ${nvDangChon.ho_ten}`
+                    : isMobile
+                    ? 'Chọn nhân viên ở danh sách bên dưới'
+                    : 'Bấm vào danh sách bên phải'
+                }
                 style={{
                   ...inputStyle,
                   backgroundColor: nvDangChon ? '#f0fdf4' : '#f8fafc',
@@ -369,7 +390,7 @@ export default function PhanQuyenPage() {
                 onClick={handleLamMoi}
                 style={{
                   flex: 1,
-                  padding: '9px',
+                  padding: isMobile ? '10px' : '9px',
                   backgroundColor: '#f1f5f9',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
@@ -386,7 +407,7 @@ export default function PhanQuyenPage() {
                 disabled={dangLuu || !nvDangChon}
                 style={{
                   flex: 1.5,
-                  padding: '9px',
+                  padding: isMobile ? '10px' : '9px',
                   backgroundColor: !nvDangChon ? '#94a3b8' : '#2563eb',
                   border: 'none',
                   borderRadius: '6px',
@@ -410,7 +431,7 @@ export default function PhanQuyenPage() {
             backgroundColor: '#fff',
             borderRadius: '8px',
             border: '1px solid #e2e8f0',
-            padding: '20px',
+            padding: isMobile ? '16px 14px' : '20px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             display: 'flex',
             flexDirection: 'column',
@@ -418,11 +439,21 @@ export default function PhanQuyenPage() {
           }}
         >
           {/* Thanh tìm kiếm & tiêu đề danh sách */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'stretch' : 'center',
+              marginBottom: '16px',
+              gap: '10px',
+              flexShrink: 0,
+            }}
+          >
             <h2 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0284c7', margin: 0 }}>
-              Danh sách tài khoản hiện có{' '}
+              Danh sách tài khoản hiện có ({ketQuaLoc.length}){' '}
               <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'normal' }}>
-                (Bấm vào dòng để chỉnh sửa)
+                (Bấm vào để chỉnh sửa)
               </span>
             </h2>
             <input
@@ -431,19 +462,93 @@ export default function PhanQuyenPage() {
               value={tuKhoa}
               onChange={(e) => setTuKhoa(e.target.value)}
               style={{
-                padding: '6px 12px',
+                padding: isMobile ? '9px 12px' : '6px 12px',
                 borderRadius: '6px',
                 border: '1px solid #cbd5e1',
-                fontSize: '12px',
+                fontSize: isMobile ? '15px' : '12px',
                 outline: 'none',
-                width: '180px',
+                width: isMobile ? '100%' : '180px',
+                boxSizing: 'border-box',
               }}
             />
           </div>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Đang nạp danh sách...</div>
+          ) : isMobile ? (
+            /* HIỂN THỊ DẠNG THẺ (CARD) TRÊN ĐIỆN THOẠI */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {ketQuaLoc.map((nv) => {
+                const isSelected = nvDangChon?.ma_nv === nv.ma_nv;
+                const isLocked = nv.phan_quyen === 'LOCKED';
+                const badge = layBadgeQuyen(nv.phan_quyen);
+
+                return (
+                  <div
+                    key={nv.ma_nv}
+                    onClick={() => handleChonNhanVien(nv)}
+                    style={{
+                      border: isSelected ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      backgroundColor: isSelected ? '#eff6ff' : isLocked ? '#fffbfb' : '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', gap: '8px' }}>
+                      <div>
+                        <span style={{ fontWeight: 'bold', color: '#0284c7', fontSize: '13px', marginRight: '8px' }}>
+                          {nv.ma_nv}
+                        </span>
+                        <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>
+                          {nv.ho_ten}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: isLocked ? '#ef4444' : '#16a34a',
+                          color: '#fff',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {isLocked ? 'Khóa' : 'Hoạt động'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
+                      📞 Mật khẩu / SĐT: <strong>{nv.so_dien_thoai || '—'}</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {(Array.isArray(badge) ? badge : [badge]).map((b, idx) => (
+                        <span
+                          key={idx}
+                          title={(b as any).title || b.text}
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            backgroundColor: b.bg,
+                            color: b.color,
+                            display: 'inline-block',
+                            border: '1px solid rgba(0,0,0,0.05)',
+                          }}
+                        >
+                          {b.text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* HIỂN THỊ DẠNG BẢNG TRÊN MÁY TÍNH */
             <div style={{ overflowY: 'auto', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
