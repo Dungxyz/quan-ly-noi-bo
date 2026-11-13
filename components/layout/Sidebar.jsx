@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
-export default function Sidebar() {
+export default function Sidebar({ isMobile = false, mobileOpen = false, onCloseMobile = () => {} }) {
   const pathname = usePathname();
   const { currentUser, kiemTraQuyen, dangXuat } = useAuth();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
@@ -73,10 +73,10 @@ export default function Sidebar() {
 
   function handleXacNhanDangXuat() {
     setShowConfirmLogout(false);
+    if (isMobile) onCloseMobile();
     dangXuat();
   }
 
-  // Hàm kiểm tra quyền
   function checkQuyen(key, isPublic) {
     if (isPublic) return true;
     if (!currentUser) return false;
@@ -88,7 +88,6 @@ export default function Sidebar() {
     return false;
   }
 
-  // Nhãn hiển thị vai trò ngắn gọn (Không in chuỗi mã dài)
   function layNhanVaiTro(role) {
     if (role === 'LOCKED') return { text: 'Khóa', bg: '#dc2626' };
     if (role === 'ADMIN' || role === 'ALL') return { text: 'ADMIN', bg: '#16a34a' };
@@ -97,29 +96,57 @@ export default function Sidebar() {
 
   const roleBadge = layNhanVaiTro(currentUser?.phan_quyen);
   const isDichVuActive = dichVuChildren.some((child) => pathname === child.path);
-
-  // Chỉ hiển thị menu cha "Dịch Vụ Đại Lý" nếu có ít nhất 1 menu con được phép
   const coQuyenDichVu = dichVuChildren.some((child) => checkQuyen(child.moduleKey, false));
+
+  // Nếu đang ở Mobile và menu chưa bấm mở thì không render Drawer
+  if (isMobile && !mobileOpen) {
+    return null;
+  }
 
   return (
     <>
+      {/* Lớp phủ mờ nền khi mở Menu trên điện thoại */}
+      {isMobile && mobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            zIndex: 9998,
+          }}
+        />
+      )}
+
       <aside
         style={{
           width: '270px',
+          maxWidth: '82vw',
           backgroundColor: '#0f172a',
           color: '#fff',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
-          position: 'sticky',
+          position: isMobile ? 'fixed' : 'sticky',
           top: 0,
+          left: 0,
+          zIndex: isMobile ? 9999 : 'auto',
           flexShrink: 0,
           borderRight: '1px solid #1e293b',
           userSelect: 'none',
+          boxShadow: isMobile ? '4px 0 20px rgba(0,0,0,0.35)' : 'none',
         }}
       >
         {/* Brand Header */}
-        <div style={{ padding: '20px', borderBottom: '1px solid #1e293b' }}>
+        <div
+          style={{
+            padding: '20px',
+            borderBottom: '1px solid #1e293b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
@@ -132,6 +159,7 @@ export default function Sidebar() {
                 justifyContent: 'center',
                 fontWeight: 'bold',
                 fontSize: '18px',
+                flexShrink: 0,
               }}
             >
               BPF
@@ -143,6 +171,29 @@ export default function Sidebar() {
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Internal Management System</span>
             </div>
           </div>
+
+          {/* Nút đóng X trên điện thoại */}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                color: '#cbd5e1',
+                width: '30px',
+                height: '30px',
+                borderRadius: '6px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Thông tin tài khoản đăng nhập */}
@@ -206,18 +257,17 @@ export default function Sidebar() {
             Phân hệ chức năng
           </div>
 
-          {/* MENU CHÍNH: KHÔNG CÓ QUYỀN THÌ ẨN LUÔN (return null) */}
           {menuItems.map((item) => {
             const duocPhep = checkQuyen(item.moduleKey, item.isPublic);
             const dangChon = pathname === item.path;
 
-            // Ẩn hoàn toàn nếu không có quyền
             if (!duocPhep) return null;
 
             return (
               <Link
                 key={item.path}
                 href={item.path}
+                onClick={() => isMobile && onCloseMobile()}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -239,7 +289,7 @@ export default function Sidebar() {
             );
           })}
 
-          {/* Cụm menu: DỊCH VỤ ĐẠI LÝ (Chỉ hiện nếu có quyền ít nhất 1 mục) */}
+          {/* Cụm menu: DỊCH VỤ ĐẠI LÝ */}
           {coQuyenDichVu && (
             <div style={{ marginTop: '8px' }}>
               <div
@@ -265,7 +315,6 @@ export default function Sidebar() {
                 <span style={{ fontSize: '11px', color: '#64748b' }}>{openDichVu ? '▼' : '▶'}</span>
               </div>
 
-              {/* Menu con của Dịch Vụ */}
               {openDichVu && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', paddingLeft: '28px' }}>
                   {dichVuChildren.map((sub) => {
@@ -278,6 +327,7 @@ export default function Sidebar() {
                       <Link
                         key={sub.path}
                         href={sub.path}
+                        onClick={() => isMobile && onCloseMobile()}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
