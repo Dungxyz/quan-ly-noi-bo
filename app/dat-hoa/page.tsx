@@ -43,44 +43,6 @@ export default function QuanLyDatHoaPage() {
   }
 
   useEffect(() => {
-    let foundUser: any = null;
-
-    // 1. Quét toàn bộ localStorage và sessionStorage (tìm mọi object có chứa ma_nv hoặc phan_quyen)
-    const storages = [window.localStorage, window.sessionStorage];
-    for (const store of storages) {
-      for (let i = 0; i < store.length; i++) {
-        const key = store.key(i);
-        if (!key) continue;
-        try {
-          const val = JSON.parse(store.getItem(key) || '');
-          if (val && typeof val === 'object' && (val.ma_nv || val.phan_quyen || val.ho_ten)) {
-            foundUser = val;
-            break;
-          }
-        } catch {}
-      }
-      if (foundUser) break;
-    }
-
-    // 2. Nếu không nằm trong Storage, quét tiếp trong Cookie
-    if (!foundUser && typeof document !== 'undefined') {
-      const cookies = document.cookie.split(';');
-      for (const c of cookies) {
-        try {
-          const rawVal = decodeURIComponent(c.split('=').slice(1).join('=').trim());
-          const val = JSON.parse(rawVal);
-          if (val && typeof val === 'object' && (val.ma_nv || val.phan_quyen || val.ho_ten)) {
-            foundUser = val;
-            break;
-          }
-        } catch {}
-      }
-    }
-
-    if (foundUser) {
-      setCurrentUser(foundUser);
-    }
-
     loadData();
   }, []);
 
@@ -99,7 +61,31 @@ export default function QuanLyDatHoaPage() {
       }
 
       if (nvData && nvData.length > 0) {
-        // Lọc bỏ tài khoản bị khóa (LOCKED)
+        // --- TỰ ĐỘNG NHẬN DIỆN NGƯỜI ĐĂNG NHẬP TỪ STORAGE / COOKIE ---
+        const allRawStrings: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const k = window.localStorage.key(i);
+          if (k) allRawStrings.push(window.localStorage.getItem(k) || '');
+        }
+        for (let i = 0; i < window.sessionStorage.length; i++) {
+          const k = window.sessionStorage.key(i);
+          if (k) allRawStrings.push(window.sessionStorage.getItem(k) || '');
+        }
+        if (typeof document !== 'undefined' && document.cookie) {
+          allRawStrings.push(decodeURIComponent(document.cookie));
+        }
+
+        const joinedStorage = allRawStrings.join(' | ');
+        const detectedUser = nvData.find(
+          (nv) => nv.ma_nv && joinedStorage.includes(String(nv.ma_nv).trim())
+        );
+
+        if (detectedUser) {
+          setCurrentUser(detectedUser);
+        }
+        // -------------------------------------------------------------
+
+        // Lọc bỏ tài khoản bị khóa (LOCKED) và đã nghỉ việc
         const nvHoatDong = nvData.filter(
           (nv) =>
             nv.phan_quyen !== 'LOCKED' &&
@@ -107,7 +93,7 @@ export default function QuanLyDatHoaPage() {
             nv.tinh_trang !== 'Đã nghỉ việc'
         );
 
-        // 2. Quét tất cả các cột để lấy đúng những người có Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
+        // Quét tất cả các cột để lấy đúng những người có Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
         const tvbhList = nvHoatDong.filter((nv) => {
           const allText = Object.values(nv)
             .filter((val) => typeof val === 'string')
@@ -115,20 +101,17 @@ export default function QuanLyDatHoaPage() {
             .toLowerCase();
           return allText.includes('tư vấn bán hàng') || allText.includes('tvbh');
         });
-
         setDanhSachTVBH(tvbhList);
 
         // Lọc Phó giám đốc kinh doanh (2 phòng)
         const pgdList = nvHoatDong.filter((nv) => {
           const allText = Object.values(nv)
             .filter((val) => typeof val === 'string')
-            .join(' ')
+            .join(' | ')
             .toLowerCase();
           return allText.includes('phó giám đốc') || allText.includes('pgđ');
         });
         setDanhSachPGD(pgdList);
-      } else {
-        console.warn('Bảng nhan_vien trả về rỗng (0 dòng). Kiểm tra lại RLS hoặc Supabase URL/Key.');
       }
 
       // 2. Lấy danh sách đơn đặt hoa
@@ -151,8 +134,12 @@ export default function QuanLyDatHoaPage() {
     setIsAfter1630(sau1630);
     setImageFile(null);
     setImagePreview('');
+
+    // Chỉ điền sẵn mã NV nếu người đang đăng nhập nằm trong danh sách TVBH
+    const isCurrentUserTVBH = danhSachTVBH.some((tv) => tv.ma_nv === currentUser?.ma_nv);
+
     setForm({
-      ma_nv_tvbh: currentUser?.ma_nv || '',
+      ma_nv_tvbh: isCurrentUserTVBH ? currentUser.ma_nv : '',
       ten_khach_hang: '',
       hop_dong_so: '',
       so_vin_bien_so: '',
@@ -213,7 +200,7 @@ export default function QuanLyDatHoaPage() {
 
       // Tìm Phó GĐKD phụ trách đúng Phòng Kinh Doanh đó để lấy ID Zalo Bot
       const pgdPhuTrach = danhSachPGD.find(
-        (pgd) => (pgd.bo_phan || pgd.phong_ban || '').toLowerCase() === phongKD.toLowerCase()
+        (pgd) => (pgd.bo_phan || pgd.phong_ban || '').toLowerCase().trim() === phongKD.toLowerCase().trim()
       );
       const chatIdPGD =
         pgdPhuTrach?.id_chat_bot ||
@@ -287,21 +274,22 @@ export default function QuanLyDatHoaPage() {
   function coQuyenDuyetDon(don: any): boolean {
     if (!currentUser) return false;
 
+    const userText = Object.values(currentUser)
+      .filter((v) => typeof v === 'string')
+      .join(' | ')
+      .toLowerCase();
+
     // 1. Admin toàn quyền duyệt mọi phòng
-    const role = (currentUser.phan_quyen || '').toUpperCase().trim();
-    if (role === 'ADMIN') return true;
+    if (userText.includes('admin')) return true;
 
     // 2. Kiểm tra có phải Phó Giám Đốc không
-    const viTri = (currentUser.vi_tri || currentUser.chuc_vu || '').toLowerCase();
-    const laPGD = viTri.includes('phó giám đốc') || viTri.includes('pgđ');
+    const laPGD = userText.includes('phó giám đốc') || userText.includes('pgđ');
     if (!laPGD) return false;
 
     // 3. Đối chiếu đúng Phòng Kinh Doanh của Phó GĐKD với Phòng của TVBH tạo đơn
     const phongCuaPGD = (currentUser.bo_phan || currentUser.phong_ban || '').toLowerCase().trim();
     const phongCuaDon = (don.phong_kinh_doanh || '').toLowerCase().trim();
 
-    // Nếu đơn cũ chỉ ghi chung "kinh doanh" thì PGĐ khối Kinh doanh đều thấy nút duyệt;
-    // Nếu đã chia "phòng kinh doanh 1" / "phòng kinh doanh 2" thì khớp chính xác từng phòng
     if (phongCuaDon === 'kinh doanh' && phongCuaPGD.includes('kinh doanh')) return true;
     return phongCuaPGD !== '' && phongCuaPGD === phongCuaDon;
   }
@@ -324,8 +312,9 @@ export default function QuanLyDatHoaPage() {
 
     try {
       const tenNguoiDuyet = currentUser
-  ? `${currentUser.ma_nv || ''} ${currentUser.ho_ten || 'Admin'}`.trim()
-  : 'Admin';
+        ? `${currentUser.ma_nv || ''} ${currentUser.ho_ten || 'Admin'}`.trim()
+        : 'Admin';
+
       const { error } = await supabase
         .from('kinh_doanh_dat_hoa')
         .update({
