@@ -154,7 +154,9 @@ export async function POST(req: Request) {
     }
 
     // =========================================================================
-    // 3. NHÁNH GỬI THÔNG BÁO ĐẶT HOA GIAO XE (DÙNG BOT 1)
+    // 3. NHÁNH GỬI THÔNG BÁO ĐẶT HOA GIAO XE
+    //    - Đơn mới: Gửi Phó GĐKD phòng đó + HCNS (Phó phòng HCNS, NV HCNS, NV IT)
+    //    - Duyệt / Từ chối: Gửi TVBH tạo đơn + HCNS (Phó phòng HCNS, NV HCNS, NV IT)
     // =========================================================================
     if (body.type === 'DAT_HOA') {
       const {
@@ -171,16 +173,28 @@ export async function POST(req: Request) {
         nguoi_duyet,
         ly_do_tu_choi,
         chat_id_pgd,
+        chat_id_tvbh,
+        list_chat_id_hcns = [],
       } = body;
 
-      if (!DANH_SACH_BOT.BOT_1.url) {
+      const botDatHoa = DANH_SACH_BOT.BOT_3.url ? DANH_SACH_BOT.BOT_3 : DANH_SACH_BOT.BOT_1;
+
+      if (!botDatHoa.url) {
         return NextResponse.json({
           success: false,
-          message: 'Chưa cấu hình ZALO_BOT_1_URL trong biến môi trường',
+          message: 'Chưa cấu hình URL Bot Zalo cho Đặt hoa trong biến môi trường',
         });
       }
 
       let noiDungHoa = '';
+      const danhSachNhan = new Set<string>();
+
+      // Luôn thêm nhóm HCNS/IT (Phó phòng HCNS, Nhân viên HCNS, Nhân viên IT)
+      if (Array.isArray(list_chat_id_hcns)) {
+        list_chat_id_hcns.forEach((id: string) => {
+          if (id && String(id).trim()) danhSachNhan.add(String(id).trim());
+        });
+      }
 
       if (hanh_dong === 'TAO_MOI') {
         const canhBaoTre = dat_sau_16h30
@@ -198,6 +212,10 @@ export async function POST(req: Request) {
 ⏰ Ngày/giờ giao xe: <b>${ngay_gio_giao_xe}</b>
 📝 Ghi chú: ${ghi_chu || 'Không có'}${canhBaoTre}${dongAnh}
 ⏳ Trạng thái: <b>CHỜ PHÓ GĐKD DUYỆT</b>`;
+
+        if (chat_id_pgd && String(chat_id_pgd).trim()) {
+          danhSachNhan.add(String(chat_id_pgd).trim());
+        }
       } else if (hanh_dong === 'DA_DUYET' || hanh_dong === 'DUYET_DON') {
         noiDungHoa = `✅ <b>[ĐÃ DUYỆT ĐƠN ĐẶT HOA GIAO XE]</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -205,6 +223,11 @@ export async function POST(req: Request) {
 👨‍💼 TVBH: <b>${tu_van_ban_hang}</b>
 ⏰ Giao xe lúc: <b>${ngay_gio_giao_xe}</b>
 ✍️ Người duyệt: <b>${nguoi_duyet}</b>`;
+
+        const uidNhanVien = chat_id_tvbh || chat_id_pgd;
+        if (uidNhanVien && String(uidNhanVien).trim()) {
+          danhSachNhan.add(String(uidNhanVien).trim());
+        }
       } else {
         noiDungHoa = `❌ <b>[TỪ CHỐI ĐƠN ĐẶT HOA]</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -212,19 +235,16 @@ export async function POST(req: Request) {
 👨‍💼 TVBH: <b>${tu_van_ban_hang}</b>
 ✍️ Phó GĐKD: <b>${nguoi_duyet}</b>
 ⚠️ Lý do: ${ly_do_tu_choi || 'Không đạt điều kiện'}`;
-      }
 
-      const danhSachNhan = new Set<string>();
-      if (DANH_SACH_BOT.BOT_1.groupId) {
-        danhSachNhan.add(DANH_SACH_BOT.BOT_1.groupId.trim());
-      }
-      if (chat_id_pgd && String(chat_id_pgd).trim()) {
-        danhSachNhan.add(String(chat_id_pgd).trim());
+        const uidNhanVien = chat_id_tvbh || chat_id_pgd;
+        if (uidNhanVien && String(uidNhanVien).trim()) {
+          danhSachNhan.add(String(uidNhanVien).trim());
+        }
       }
 
       const ketQua = await Promise.all(
         Array.from(danhSachNhan).map(async (targetId) => {
-          const res = await fetch(DANH_SACH_BOT.BOT_1.url, {
+          const res = await fetch(botDatHoa.url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

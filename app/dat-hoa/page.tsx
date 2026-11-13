@@ -14,6 +14,7 @@ export default function QuanLyDatHoaPage() {
   const [danhSachHoa, setDanhSachHoa] = useState<any[]>([]);
   const [danhSachTVBH, setDanhSachTVBH] = useState<any[]>([]);
   const [danhSachPGD, setDanhSachPGD] = useState<any[]>([]);
+  const [danhSachHCNS, setDanhSachHCNS] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // State của tab ĐẶT HOA GIAO XE
@@ -62,6 +63,18 @@ export default function QuanLyDatHoaPage() {
   function layViTriCuaNV(nv: any): string {
     if (!nv) return '';
     return String(nv.vi_tri || nv.chuc_vu || nv.chuc_danh || '').trim();
+  }
+
+  // Helper lấy ID Zalo Bot của nhân viên (ưu tiên Bot 3 nếu dùng Bot 3, fallback về Bot 1)
+  function layIdBotNhanThongBao(nv: any): string {
+    if (!nv) return '';
+    return String(
+      nv.id_doan_chat_bot_3 ||
+      nv.id_doan_chat_bot ||
+      nv.id_chat_bot ||
+      nv.id_zalo_bot ||
+      ''
+    ).trim();
   }
 
   // Kiểm tra giờ Việt Nam hiện tại có sau 16h30 không
@@ -145,6 +158,19 @@ export default function QuanLyDatHoaPage() {
           return bp === 'kinh doanh' && (vt.includes('phó giám đốc kinh doanh') || vt.includes('phó giám đốc'));
         });
         setDanhSachPGD(pgdList);
+
+        // Lấy nhóm HCNS / IT nhận thông báo đặt hoa (Phó phòng HCNS, Nhân viên HCNS, Nhân viên IT)
+        const hcnsList = nvHoatDong.filter((nv) => {
+          const bp = norm(layBoPhanCuaNV(nv));
+          const vt = norm(layViTriCuaNV(nv));
+          return (
+            bp === 'hcns' &&
+            (vt.includes('phó phòng hcns') ||
+              vt.includes('nhân viên hcns') ||
+              vt.includes('nhân viên it'))
+          );
+        });
+        setDanhSachHCNS(hcnsList);
       }
 
       const { data: hoaData } = await supabase
@@ -289,11 +315,10 @@ export default function QuanLyDatHoaPage() {
       const pgdPhuTrach = danhSachPGD.find(
         (pgd) => norm(layPhongCuaNV(pgd)) === norm(phongKD)
       );
-      const chatIdPGD =
-        pgdPhuTrach?.id_chat_bot ||
-        pgdPhuTrach?.id_zalo_bot ||
-        pgdPhuTrach?.uid_zalo ||
-        '';
+      const chatIdPGD = layIdBotNhanThongBao(pgdPhuTrach);
+      const listChatIdHCNS = danhSachHCNS
+        .map((nv) => layIdBotNhanThongBao(nv))
+        .filter((id) => id !== '');
 
       const { error: insertErr } = await supabase.from('kinh_doanh_dat_hoa').insert([
         {
@@ -337,13 +362,14 @@ export default function QuanLyDatHoaPage() {
           dat_sau_16h30: sau1630HienTai,
           hinh_anh_url: uploadedImageUrl,
           chat_id_pgd: chatIdPGD,
+          list_chat_id_hcns: listChatIdHCNS,
         }),
       });
 
       alert(
         `✅ Đã gửi yêu cầu đặt hoa cho khách ${form.ten_khach_hang}!\nChuyển duyệt tới: ${phongKD}${
           pgdPhuTrach ? ` (${pgdPhuTrach.ho_ten})` : ''
-        }`
+        } & bộ phận HCNS/IT`
       );
       setModalOpen(false);
       loadData();
@@ -386,8 +412,13 @@ export default function QuanLyDatHoaPage() {
 
       if (error) throw error;
 
-      const tvbhObj = danhSachTVBH.find((x) => x.ma_nv === don.ma_nv_tvbh);
-      const uidTVBH = tvbhObj?.id_chat_bot || tvbhObj?.id_zalo_bot || '';
+      const tvbhObj = danhSachTVBH.find(
+        (x) => String(x.ma_nv).trim() === String(don.ma_nv_tvbh).trim()
+      );
+      const uidTVBH = layIdBotNhanThongBao(tvbhObj);
+      const listChatIdHCNS = danhSachHCNS
+        .map((nv) => layIdBotNhanThongBao(nv))
+        .filter((id) => id !== '');
 
       await fetch('/api/zalo-bot', {
         method: 'POST',
@@ -401,7 +432,8 @@ export default function QuanLyDatHoaPage() {
           ngay_gio_giao_xe: new Date(don.ngay_gio_giao_xe).toLocaleString('vi-VN'),
           nguoi_duyet: tenNguoiDuyet,
           ly_do_tu_choi: lyDo,
-          chat_id_pgd: uidTVBH,
+          chat_id_tvbh: uidTVBH,
+          list_chat_id_hcns: listChatIdHCNS,
         }),
       });
 
