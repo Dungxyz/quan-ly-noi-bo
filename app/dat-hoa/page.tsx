@@ -43,20 +43,44 @@ export default function QuanLyDatHoaPage() {
   }
 
   useEffect(() => {
-    // Quét tất cả các key có thể dùng để lưu phiên đăng nhập
-    const possibleKeys = ['user_info', 'currentUser', 'bpf_user', 'user', 'auth_user', 'login_user'];
-    for (const key of possibleKeys) {
-      const raw = localStorage.getItem(key);
-      if (raw) {
+    let foundUser: any = null;
+
+    // 1. Quét toàn bộ localStorage và sessionStorage (tìm mọi object có chứa ma_nv hoặc phan_quyen)
+    const storages = [window.localStorage, window.sessionStorage];
+    for (const store of storages) {
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i);
+        if (!key) continue;
         try {
-          const parsed = JSON.parse(raw);
-          if (parsed && (parsed.ma_nv || parsed.ho_ten)) {
-            setCurrentUser(parsed);
+          const val = JSON.parse(store.getItem(key) || '');
+          if (val && typeof val === 'object' && (val.ma_nv || val.phan_quyen || val.ho_ten)) {
+            foundUser = val;
+            break;
+          }
+        } catch {}
+      }
+      if (foundUser) break;
+    }
+
+    // 2. Nếu không nằm trong Storage, quét tiếp trong Cookie
+    if (!foundUser && typeof document !== 'undefined') {
+      const cookies = document.cookie.split(';');
+      for (const c of cookies) {
+        try {
+          const rawVal = decodeURIComponent(c.split('=').slice(1).join('=').trim());
+          const val = JSON.parse(rawVal);
+          if (val && typeof val === 'object' && (val.ma_nv || val.phan_quyen || val.ho_ten)) {
+            foundUser = val;
             break;
           }
         } catch {}
       }
     }
+
+    if (foundUser) {
+      setCurrentUser(foundUser);
+    }
+
     loadData();
   }, []);
 
@@ -299,7 +323,9 @@ export default function QuanLyDatHoaPage() {
     }
 
     try {
-      const tenNguoiDuyet = `${currentUser.ma_nv} ${currentUser.ho_ten}`;
+      const tenNguoiDuyet = currentUser
+  ? `${currentUser.ma_nv || ''} ${currentUser.ho_ten || 'Admin'}`.trim()
+  : 'Admin';
       const { error } = await supabase
         .from('kinh_doanh_dat_hoa')
         .update({
