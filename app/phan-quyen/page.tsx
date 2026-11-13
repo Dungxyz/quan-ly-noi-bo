@@ -1,23 +1,46 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Toast from '@/components/common/Toast';
 import { DANH_MUC_QUYEN, TAT_CA_MA_QUYEN, layBadgeQuyen } from '@/constants/quyenConfig';
 
+interface NhanVienQuyen {
+  ma_nv: string;
+  ho_ten: string;
+  so_dien_thoai: string;
+  bo_phan?: string;
+  vi_tri?: string;
+  phan_quyen: string;
+}
+
 export default function PhanQuyenPage() {
-  const [danhSach, setDanhSach] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tuKhoa, setTuKhoa] = useState('');
-  const [dangLuu, setDangLuu] = useState(false);
-  const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
+  const [danhSach, setDanhSach] = useState<NhanVienQuyen[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [tuKhoa, setTuKhoa] = useState<string>('');
+  const [dangLuu, setDangLuu] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ show: boolean; type: 'success' | 'error' | 'warning'; message: string }>({
+    show: false,
+    type: 'success',
+    message: '',
+  });
 
   // State thông tin form cấp quyền bên trái
-  const [nvDangChon, setNvDangChon] = useState(null);
-  const [dsQuyenDaChon, setDsQuyenDaChon] = useState([]);
-  const [trangThaiHoatDong, setTrangThaiHoatDong] = useState('ACTIVE');
+  const [nvDangChon, setNvDangChon] = useState<NhanVienQuyen | null>(null);
+  const [dsQuyenDaChon, setDsQuyenDaChon] = useState<string[]>([]);
+  const [trangThaiHoatDong, setTrangThaiHoatDong] = useState<string>('ACTIVE');
 
-  function baoTin(message, type = 'success') {
+  // Lọc bỏ mục "Đặt hoa bàn giao" khỏi giao diện cấp quyền thủ công (vì đã phân quyền tự động trong code)
+  const danhMucQuyenHienThi = DANH_MUC_QUYEN.filter(
+    (nhom: any) => !String(nhom.nhom || '').toLowerCase().includes('đặt hoa')
+  );
+
+  // Danh sách toàn bộ mã quyền còn lại sau khi ẩn nhóm Đặt hoa
+  const tatCaMaQuyenHienThi: string[] = danhMucQuyenHienThi.flatMap((nhom: any) =>
+    nhom.danhSach.map((q: any) => q.id)
+  );
+
+  function baoTin(message: string, type: 'success' | 'error' | 'warning' = 'success') {
     setToast({ show: true, type, message });
     setTimeout(() => setToast({ show: false, type: 'success', message: '' }), 3500);
   }
@@ -33,7 +56,7 @@ export default function PhanQuyenPage() {
     if (error) {
       baoTin('Lỗi nạp danh sách: ' + error.message, 'error');
     } else {
-      setDanhSach(data || []);
+      setDanhSach((data as NhanVienQuyen[]) || []);
     }
     setLoading(false);
   }
@@ -43,7 +66,7 @@ export default function PhanQuyenPage() {
   }, []);
 
   // 2. Khi click vào dòng nhân viên bên bảng phải
-  function handleChonNhanVien(nv) {
+  function handleChonNhanVien(nv: NhanVienQuyen) {
     setNvDangChon(nv);
 
     if (nv.phan_quyen === 'LOCKED') {
@@ -52,9 +75,13 @@ export default function PhanQuyenPage() {
     } else {
       setTrangThaiHoatDong('ACTIVE');
       if (nv.phan_quyen === 'ADMIN') {
-        setDsQuyenDaChon(TAT_CA_MA_QUYEN);
+        setDsQuyenDaChon(tatCaMaQuyenHienThi);
       } else if (nv.phan_quyen && nv.phan_quyen !== 'ACTIVE') {
-        setDsQuyenDaChon(nv.phan_quyen.split(',').map((x) => x.trim()));
+        const quyenHopLe = nv.phan_quyen
+          .split(',')
+          .map((x) => x.trim())
+          .filter((id) => tatCaMaQuyenHienThi.includes(id));
+        setDsQuyenDaChon(quyenHopLe);
       } else {
         setDsQuyenDaChon([]);
       }
@@ -69,7 +96,7 @@ export default function PhanQuyenPage() {
   }
 
   // 4. Bật / Tắt một quyền đơn lẻ
-  function toggleQuyen(idQuyen) {
+  function toggleQuyen(idQuyen: string) {
     setDsQuyenDaChon((prev) =>
       prev.includes(idQuyen) ? prev.filter((x) => x !== idQuyen) : [...prev, idQuyen]
     );
@@ -77,14 +104,14 @@ export default function PhanQuyenPage() {
 
   // 5. Nút Chọn hết / Bỏ hết
   function handleChonHet() {
-    setDsQuyenDaChon(TAT_CA_MA_QUYEN);
+    setDsQuyenDaChon(tatCaMaQuyenHienThi);
   }
   function handleBoHet() {
     setDsQuyenDaChon([]);
   }
 
   // 6. Lưu phân quyền xuống Supabase
-  async function handleLuuPhanQuyen(e) {
+  async function handleLuuPhanQuyen(e: React.FormEvent) {
     e.preventDefault();
     if (!nvDangChon) {
       return baoTin('Vui lòng bấm chọn một nhân viên từ danh sách bên phải!', 'warning');
@@ -95,7 +122,10 @@ export default function PhanQuyenPage() {
     let phanQuyenMoi = 'ACTIVE';
     if (trangThaiHoatDong === 'LOCKED') {
       phanQuyenMoi = 'LOCKED';
-    } else if (dsQuyenDaChon.length === TAT_CA_MA_QUYEN.length) {
+    } else if (
+      tatCaMaQuyenHienThi.length > 0 &&
+      dsQuyenDaChon.length === tatCaMaQuyenHienThi.length
+    ) {
       phanQuyenMoi = 'ADMIN';
     } else if (dsQuyenDaChon.length > 0) {
       phanQuyenMoi = dsQuyenDaChon.join(',');
@@ -123,8 +153,8 @@ export default function PhanQuyenPage() {
     setDangLuu(false);
   }
 
-  // 1. Hàm bỏ dấu tiếng Việt
-  function boDauTiengViet(str) {
+  // Hàm bỏ dấu tiếng Việt
+  function boDauTiengViet(str: string): string {
     if (!str) return '';
     return str
       .normalize('NFD')
@@ -135,7 +165,7 @@ export default function PhanQuyenPage() {
       .trim();
   }
 
-  // 2. Tính lại ketQuaLoc trực tiếp theo tuKhoa và danhSach
+  // Lọc danh sách theo từ khóa
   const ketQuaLoc = danhSach.filter((nv) => {
     if (!tuKhoa || !tuKhoa.trim()) return true;
 
@@ -152,15 +182,17 @@ export default function PhanQuyenPage() {
   });
 
   return (
-    <div style={{
+    <div
+      style={{
         padding: '24px',
         backgroundColor: '#f8fafc',
-        height: '100vh',           // 👉 Khóa cứng vừa khít chiều cao màn hình
+        height: '100vh',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',        // 👉 Không bao giờ cuộn bung cả trang web 
-        }}>
+        overflow: 'hidden',
+      }}
+    >
       <Toast toast={toast} onClose={() => setToast({ show: false, type: 'success', message: '' })} />
 
       {/* TIÊU ĐỀ TRANG */}
@@ -176,17 +208,17 @@ export default function PhanQuyenPage() {
         </p>
       </div>
 
-      {/* BỐ CỤC 2 CỘT (Trái: Cấp quyền, Phải: Danh sách tài khoản) */}
+      {/* BỐ CỤC 2 CỘT */}
       <div
         style={{
           display: 'flex',
           gap: '24px',
-          flex: 1,                 // Chiếm trọn phần chiều cao còn lại
-          minHeight: 0,            // Bắt buộc để con cuộn được độc lập
+          flex: 1,
+          minHeight: 0,
           alignItems: 'stretch',
         }}
       >
-        {/* CỘT TRÁI: FORM CẤP QUYỀN (ĐỨNG IM 100%, TỰ CUỘN NẾU MÀN HÌNH NHỎ) */}
+        {/* CỘT TRÁI: FORM CẤP QUYỀN */}
         <div
           style={{
             width: '380px',
@@ -196,11 +228,21 @@ export default function PhanQuyenPage() {
             border: '1px solid #e2e8f0',
             padding: '20px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            overflowY: 'auto',     // Form tự cuộn nhẹ nếu màn hình quá ngắn
+            overflowY: 'auto',
             boxSizing: 'border-box',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#0284c7', fontWeight: 'bold', fontSize: '15px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '16px',
+              color: '#0284c7',
+              fontWeight: 'bold',
+              fontSize: '15px',
+            }}
+          >
             <span>👤</span> Cấp quyền tài khoản
           </div>
 
@@ -256,49 +298,55 @@ export default function PhanQuyenPage() {
               </div>
             </div>
 
-            {/* DANH SÁCH CHECKBOX CÁC NHÓM QUYỀN (Cuộn dọc) */}
-            <div style={{ 
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              padding: '12px',
-              maxHeight: '240px', // 👉 Giới hạn độ cao vừa vặn màn hình
-              overflowY: 'auto',  // 👉 Chỉ cho phép cuộn bên trong khối này
-              marginBottom: '16px'
-              }}>
-              {DANH_MUC_QUYEN.map((nhom) => (
-                <div key={nhom.nhom} style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0369a1', marginBottom: '8px' }}>
-                    {nhom.icon} {nhom.nhom}
+            {/* DANH SÁCH CHECKBOX CÁC NHÓM QUYỀN */}
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '12px',
+                maxHeight: '240px',
+                overflowY: 'auto',
+                marginBottom: '16px',
+              }}
+            >
+              {danhMucQuyenHienThi.map((nhom: any, idx: number) => {
+                // Đánh lại số thứ tự hiển thị 1., 2., 3... cho liền mạch sau khi ẩn Đặt hoa
+                const tenNhomSach = String(nhom.nhom || '').replace(/^\d+\.\s*/, '');
+                return (
+                  <div key={nhom.nhom} style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0369a1', marginBottom: '8px' }}>
+                      {nhom.icon} {idx + 1}. {tenNhomSach}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px' }}>
+                      {nhom.danhSach.map((quyen: any) => {
+                        const checked = dsQuyenDaChon.includes(quyen.id);
+                        return (
+                          <label
+                            key={quyen.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '12px',
+                              color: checked ? '#0f172a' : '#64748b',
+                              cursor: 'pointer',
+                              userSelect: 'none',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleQuyen(quyen.id)}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            {quyen.label}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px' }}>
-                    {nhom.danhSach.map((quyen) => {
-                      const checked = dsQuyenDaChon.includes(quyen.id);
-                      return (
-                        <label
-                          key={quyen.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '12px',
-                            color: checked ? '#0f172a' : '#64748b',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleQuyen(quyen.id)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          {quyen.label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Trạng thái hoạt động */}
@@ -319,7 +367,17 @@ export default function PhanQuyenPage() {
               <button
                 type="button"
                 onClick={handleLamMoi}
-                style={{ flex: 1, padding: '9px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: '600', fontSize: '13px', cursor: 'pointer', color: '#475569' }}
+                style={{
+                  flex: 1,
+                  padding: '9px',
+                  backgroundColor: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  color: '#475569',
+                }}
               >
                 Làm mới form
               </button>
@@ -359,7 +417,7 @@ export default function PhanQuyenPage() {
             boxSizing: 'border-box',
           }}
         >
-          {/* Thanh tìm kiếm & tiêu đề danh sách (Đứng yên) */}
+          {/* Thanh tìm kiếm & tiêu đề danh sách */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
             <h2 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0284c7', margin: 0 }}>
               Danh sách tài khoản hiện có{' '}
@@ -386,7 +444,7 @@ export default function PhanQuyenPage() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Đang nạp danh sách...</div>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+            <div style={{ overflowY: 'auto', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '12px' }}>
@@ -424,20 +482,26 @@ export default function PhanQuyenPage() {
                           {nv.so_dien_thoai}
                         </td>
                         <td style={{ padding: '10px 14px' }}>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              padding: '3px 10px',
-                              borderRadius: '12px',
-                              backgroundColor: badge.bg,
-                              color: badge.color,
-                              display: 'inline-block',
-                              border: '1px solid rgba(0,0,0,0.05)',
-                            }}
-                          >
-                            {badge.text}
-                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {(Array.isArray(badge) ? badge : [badge]).map((b, idx) => (
+                              <span
+                                key={idx}
+                                title={(b as any).title || b.text}
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  padding: '3px 10px',
+                                  borderRadius: '12px',
+                                  backgroundColor: b.bg,
+                                  color: b.color,
+                                  display: 'inline-block',
+                                  border: '1px solid rgba(0,0,0,0.05)',
+                                }}
+                              >
+                                {b.text}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                           <span
@@ -466,7 +530,7 @@ export default function PhanQuyenPage() {
   );
 }
 
-const labelStyle = {
+const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '12px',
   fontWeight: '600',
@@ -474,7 +538,7 @@ const labelStyle = {
   marginBottom: '5px',
 };
 
-const inputStyle = {
+const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
   borderRadius: '4px',
