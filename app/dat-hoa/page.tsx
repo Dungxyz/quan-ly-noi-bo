@@ -621,7 +621,7 @@ export default function QuanLyDatHoaPage() {
                   <option value="">-- Chọn Tư vấn bán hàng --</option>
                   {danhSachTVBH.map((tv) => (
                     <option key={tv.ma_nv} value={tv.ma_nv}>
-                      {tv.ma_nv} {tv.ho_ten} ({tv.bo_phan || tv.phong_ban || 'KD'})
+                      {tv.ma_nv} {tv.ho_ten}
                     </option>
                   ))}
                 </select>
