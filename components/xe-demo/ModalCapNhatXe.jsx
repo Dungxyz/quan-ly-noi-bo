@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
+  const [isMobile, setIsMobile] = useState(false);
+
   const [formData, setFormData] = useState({
     loai_xe: '',
     bien_so: '',
@@ -19,12 +21,17 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
   const [loadingNV, setLoadingNV] = useState(false);
   const [dangLuu, setDangLuu] = useState(false);
 
-  // State phục vụ tìm kiếm thông minh nhân sự
   const [searchNV, setSearchNV] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const searchBoxRef = useRef(null);
 
-  // Tải danh sách nhân viên: Chỉ loại trừ nhân viên đã nghỉ việc
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     async function layNhanVien() {
       setLoadingNV(true);
@@ -34,11 +41,9 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
         .order('ho_ten', { ascending: true });
 
       if (!error && data) {
-        // Chỉ cần không phải 'Đã nghỉ việc' là lấy tất cả
         const danhSachKhaDung = data.filter(
           (nv) => nv.trang_thai !== 'Đã nghỉ việc'
         );
-
         setDanhSachNV(danhSachKhaDung);
       }
       setLoadingNV(false);
@@ -49,7 +54,6 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
     }
   }, [isOpen]);
 
-  // Đổ dữ liệu xe vào form khi mở popup
   useEffect(() => {
     if (xe) {
       setFormData({
@@ -67,7 +71,6 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
     }
   }, [xe]);
 
-  // Đóng dropdown tìm kiếm khi click chuột ra ngoài
   useEffect(() => {
     function handleClickOutside(event) {
       if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
@@ -81,8 +84,12 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
   if (!isOpen || !xe) return null;
 
   const isDangDi = formData.trang_thai === 'Đang đi';
+  const responsiveInputStyle = {
+    ...inputStyle,
+    fontSize: isMobile ? '15px' : '13px',
+    padding: isMobile ? '10px 12px' : '8px 12px',
+  };
 
-  // Lọc nhân viên theo từ khóa (Mã NV hoặc Tên)
   const dsLocNV = danhSachNV.filter((nv) => {
     if (!searchNV.trim()) return true;
     const query = searchNV.toLowerCase().trim();
@@ -136,13 +143,13 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backgroundColor: 'rgba(15, 23, 42, 0.5)',
         backdropFilter: 'blur(2px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999,
-        padding: '16px',
+        padding: isMobile ? '10px' : '16px',
       }}
     >
       <div
@@ -151,7 +158,10 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
           borderRadius: '10px',
           width: '100%',
           maxWidth: '460px',
-          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
           border: '1px solid #e2e8f0',
           overflow: 'hidden',
         }}
@@ -159,11 +169,12 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
         {/* Header Modal */}
         <div
           style={{
-            padding: '14px 20px',
+            padding: isMobile ? '12px 16px' : '14px 20px',
             borderBottom: '1px solid #f1f5f9',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -188,28 +199,29 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
           </button>
         </div>
 
-        {/* Nội dung Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '20px' }}>
-          {/* LOẠI XE */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>LOẠI XE</label>
-            <input
-              type="text"
-              readOnly
-              value={formData.loai_xe}
-              style={{ ...inputStyle, backgroundColor: '#f8fafc', color: '#64748b' }}
-            />
-          </div>
+        {/* Nội dung Form (Cuộn mượt bên trong) */}
+        <form onSubmit={handleSubmit} style={{ padding: isMobile ? '16px' : '20px', overflowY: 'auto', flex: 1 }}>
+          {/* LOẠI XE & BIỂN SỐ (Gộp 2 cột trên mobile cho gọn chiều cao) */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1.3fr 1fr' : '1fr', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <label style={labelStyle}>LOẠI XE</label>
+              <input
+                type="text"
+                readOnly
+                value={formData.loai_xe}
+                style={{ ...responsiveInputStyle, backgroundColor: '#f8fafc', color: '#64748b' }}
+              />
+            </div>
 
-          {/* BIỂN SỐ */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>BIỂN SỐ</label>
-            <input
-              type="text"
-              readOnly
-              value={formData.bien_so}
-              style={{ ...inputStyle, backgroundColor: '#f8fafc', color: '#64748b', fontWeight: '600' }}
-            />
+            <div>
+              <label style={labelStyle}>BIỂN SỐ</label>
+              <input
+                type="text"
+                readOnly
+                value={formData.bien_so}
+                style={{ ...responsiveInputStyle, backgroundColor: '#f8fafc', color: '#64748b', fontWeight: '600' }}
+              />
+            </div>
           </div>
 
           {/* TRẠNG THÁI */}
@@ -219,11 +231,11 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
               value={formData.trang_thai}
               onChange={(e) => setFormData({ ...formData, trang_thai: e.target.value })}
               style={{
-                ...inputStyle,
-                color: isDangDi ? '#d97706' : '#16a34a',
+                ...responsiveInputStyle,
+                color: isDangDi ? '#d97706' : formData.trang_thai === 'Bảo dưỡng' ? '#dc2626' : '#16a34a',
                 fontWeight: 'bold',
-                fontSize: '14px',
                 cursor: 'pointer',
+                backgroundColor: '#fff',
               }}
             >
               <option value="Sẵn xe" style={{ color: '#16a34a', fontWeight: 'bold' }}>
@@ -245,11 +257,10 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                 backgroundColor: '#fffbeb',
                 border: '1px solid #fef3c7',
                 borderRadius: '8px',
-                padding: '14px',
+                padding: '12px',
                 marginBottom: '14px',
               }}
             >
-              {/* SEARCH AUTOCOMPLETE INPUT */}
               <div style={{ marginBottom: '10px', position: 'relative' }} ref={searchBoxRef}>
                 <label style={{ ...labelStyle, color: '#b45309' }}>
                   NGƯỜI ĐI (NHẬP MÃ NV HOẶC TÊN) *
@@ -270,7 +281,7 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                       setFormData((prev) => ({ ...prev, nguoi_di: e.target.value }));
                     }}
                     style={{
-                      ...inputStyle,
+                      ...responsiveInputStyle,
                       paddingLeft: '32px',
                       paddingRight: formData.nguoi_di ? '32px' : '10px',
                       backgroundColor: '#fff',
@@ -300,7 +311,6 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                   )}
                 </div>
 
-                {/* DANH SÁCH GỢI Ý POPUP KHI GÕ */}
                 {isSearching && (
                   <div
                     style={{
@@ -312,7 +322,7 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                       backgroundColor: '#fff',
                       borderRadius: '6px',
                       border: '1px solid #e2e8f0',
-                      boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                      boxShadow: '0 10px 15px -3px rgba(0,0,0,0.15)',
                       maxHeight: '180px',
                       overflowY: 'auto',
                       zIndex: 100,
@@ -328,16 +338,13 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                           key={nv.ma_nv}
                           onClick={() => handleChonNhanVien(nv)}
                           style={{
-                            padding: '8px 12px',
+                            padding: '9px 12px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             borderBottom: '1px solid #f8fafc',
-                            transition: 'background-color 0.1s',
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fff')}
                         >
                           <div>
                             <span style={{ fontWeight: '600', fontSize: '13px', color: '#0f172a' }}>
@@ -366,7 +373,6 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                 )}
               </div>
 
-              {/* KHU VỰC / MỤC ĐÍCH */}
               <div>
                 <label style={{ ...labelStyle, color: '#b45309' }}>KHU VỰC / MỤC ĐÍCH</label>
                 <input
@@ -374,7 +380,7 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                   placeholder="VD: Showroom, Đồng Xoài, Bình Long..."
                   value={formData.khu_vuc}
                   onChange={(e) => setFormData({ ...formData, khu_vuc: e.target.value })}
-                  style={inputStyle}
+                  style={responsiveInputStyle}
                 />
               </div>
             </div>
@@ -392,8 +398,8 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                 value={formData.so_km}
                 onChange={(e) => setFormData({ ...formData, so_km: e.target.value })}
                 style={{
-                  ...inputStyle,
-                  paddingRight: '75px',
+                  ...responsiveInputStyle,
+                  paddingRight: '78px',
                   fontWeight: '600',
                   color: '#0f172a',
                 }}
@@ -404,7 +410,7 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
                   right: '6px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '2px',
+                  gap: '4px',
                 }}
               >
                 <button
@@ -435,29 +441,36 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
               placeholder="VD: xe dơ, trầy cản trước..."
               value={formData.ghi_chu}
               onChange={(e) => setFormData({ ...formData, ghi_chu: e.target.value })}
-              style={inputStyle}
+              style={responsiveInputStyle}
             />
           </div>
 
           {/* CẢNH BÁO */}
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '18px' }}>
             <label style={labelStyle}>CẢNH BÁO</label>
             <input
               type="text"
               placeholder="VD: Sắp đến hạn bảo dưỡng 30.000 km..."
               value={formData.canh_bao}
               onChange={(e) => setFormData({ ...formData, canh_bao: e.target.value })}
-              style={inputStyle}
+              style={responsiveInputStyle}
             />
           </div>
 
           {/* Nút lưu & đóng */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <div
+            style={{
+              display: isMobile ? 'grid' : 'flex',
+              gridTemplateColumns: isMobile ? '1fr 1.6fr' : undefined,
+              justifyContent: 'flex-end',
+              gap: '10px',
+            }}
+          >
             <button
               type="button"
               onClick={onClose}
               style={{
-                padding: '9px 18px',
+                padding: isMobile ? '11px 14px' : '9px 18px',
                 backgroundColor: '#fff',
                 border: '1px solid #cbd5e1',
                 borderRadius: '6px',
@@ -473,7 +486,7 @@ export default function ModalCapNhatXe({ isOpen, onClose, xe, onSave }) {
               type="submit"
               disabled={dangLuu}
               style={{
-                padding: '9px 24px',
+                padding: isMobile ? '11px 18px' : '9px 24px',
                 backgroundColor: '#0284c7',
                 border: 'none',
                 borderRadius: '6px',
@@ -513,8 +526,8 @@ const inputStyle = {
 };
 
 const btnStepperStyle = {
-  width: '28px',
-  height: '28px',
+  width: '30px',
+  height: '30px',
   border: 'none',
   backgroundColor: '#f1f5f9',
   color: '#334155',
