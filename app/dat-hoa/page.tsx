@@ -43,9 +43,19 @@ export default function QuanLyDatHoaPage() {
   }
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user_info');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
+    // Quét tất cả các key có thể dùng để lưu phiên đăng nhập
+    const possibleKeys = ['user_info', 'currentUser', 'bpf_user', 'user', 'auth_user', 'login_user'];
+    for (const key of possibleKeys) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.ma_nv || parsed.ho_ten)) {
+            setCurrentUser(parsed);
+            break;
+          }
+        } catch {}
+      }
     }
     loadData();
   }, []);
@@ -252,14 +262,23 @@ export default function QuanLyDatHoaPage() {
   // Kiểm tra user hiện tại có quyền duyệt đơn hoa này không (Admin hoặc Phó GĐKD cùng phòng)
   function coQuyenDuyetDon(don: any): boolean {
     if (!currentUser) return false;
-    if (currentUser.phan_quyen === 'ADMIN') return true;
 
+    // 1. Admin toàn quyền duyệt mọi phòng
+    const role = (currentUser.phan_quyen || '').toUpperCase().trim();
+    if (role === 'ADMIN') return true;
+
+    // 2. Kiểm tra có phải Phó Giám Đốc không
     const viTri = (currentUser.vi_tri || currentUser.chuc_vu || '').toLowerCase();
     const laPGD = viTri.includes('phó giám đốc') || viTri.includes('pgđ');
     if (!laPGD) return false;
 
+    // 3. Đối chiếu đúng Phòng Kinh Doanh của Phó GĐKD với Phòng của TVBH tạo đơn
     const phongCuaPGD = (currentUser.bo_phan || currentUser.phong_ban || '').toLowerCase().trim();
     const phongCuaDon = (don.phong_kinh_doanh || '').toLowerCase().trim();
+
+    // Nếu đơn cũ chỉ ghi chung "kinh doanh" thì PGĐ khối Kinh doanh đều thấy nút duyệt;
+    // Nếu đã chia "phòng kinh doanh 1" / "phòng kinh doanh 2" thì khớp chính xác từng phòng
+    if (phongCuaDon === 'kinh doanh' && phongCuaPGD.includes('kinh doanh')) return true;
     return phongCuaPGD !== '' && phongCuaPGD === phongCuaDon;
   }
 
