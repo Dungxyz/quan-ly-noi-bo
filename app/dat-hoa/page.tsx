@@ -33,6 +33,32 @@ export default function QuanLyDatHoaPage() {
     ghi_chu: '',
   });
 
+  // Helper chuẩn hóa chuỗi để so sánh không lệch dấu/khoảng trắng
+  function norm(val: any): string {
+    return String(val || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Helper lấy giá trị cột Phòng của nhân viên (VD: "Kinh doanh 1", "Kinh doanh 2")
+  function layPhongCuaNV(nv: any): string {
+    if (!nv) return '';
+    return String(nv.phong || nv.phong_ban || nv.ten_phong || '').trim();
+  }
+
+  // Helper lấy giá trị cột Bộ Phận (VD: "Kinh doanh", "HCNS")
+  function layBoPhanCuaNV(nv: any): string {
+    if (!nv) return '';
+    return String(nv.bo_phan || '').trim();
+  }
+
+  // Helper lấy giá trị cột Vị Trí / Chức Vụ
+  function layViTriCuaNV(nv: any): string {
+    if (!nv) return '';
+    return String(nv.vi_tri || nv.chuc_vu || nv.chuc_danh || '').trim();
+  }
+
   // Kiểm tra giờ Việt Nam hiện tại có sau 16h30 không
   function checkSau16h30(): boolean {
     const now = new Date();
@@ -90,26 +116,21 @@ export default function QuanLyDatHoaPage() {
           (nv) =>
             nv.phan_quyen !== 'LOCKED' &&
             nv.trang_thai !== 'LOCKED' &&
-            nv.tinh_trang !== 'Đã nghỉ việc'
+            norm(nv.tinh_trang) !== 'đã nghỉ việc'
         );
 
-        // Quét tất cả các cột để lấy đúng những người có Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
+        // Lấy đúng những người có Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
         const tvbhList = nvHoatDong.filter((nv) => {
-          const allText = Object.values(nv)
-            .filter((val) => typeof val === 'string')
-            .join(' | ')
-            .toLowerCase();
-          return allText.includes('tư vấn bán hàng') || allText.includes('tvbh');
+          const vt = norm(layViTriCuaNV(nv));
+          return vt.includes('tư vấn bán hàng') || vt === 'tvbh';
         });
         setDanhSachTVBH(tvbhList);
 
-        // Lọc Phó giám đốc kinh doanh (2 phòng)
+        // Lọc Phó Giám đốc Kinh doanh (của các phòng)
         const pgdList = nvHoatDong.filter((nv) => {
-          const allText = Object.values(nv)
-            .filter((val) => typeof val === 'string')
-            .join(' | ')
-            .toLowerCase();
-          return allText.includes('phó giám đốc') || allText.includes('pgđ');
+          const bp = norm(layBoPhanCuaNV(nv));
+          const vt = norm(layViTriCuaNV(nv));
+          return bp === 'kinh doanh' && (vt.includes('phó giám đốc kinh doanh') || vt.includes('phó giám đốc'));
         });
         setDanhSachPGD(pgdList);
       }
@@ -128,6 +149,74 @@ export default function QuanLyDatHoaPage() {
     }
   }
 
+  // =========================================================================
+  // PHÂN QUYỀN XEM & DUYỆT ĐƠN ĐẶT HOA
+  // =========================================================================
+  function getVaiTroUser(user: any) {
+    if (!user) return { isToanQuyen: false, isPGDKD: false, phongPGD: '', maNV: '' };
+
+    const role = String(user.phan_quyen || '').toUpperCase().trim();
+    const bp = norm(layBoPhanCuaNV(user));
+    const vt = norm(layViTriCuaNV(user));
+    const phong = norm(layPhongCuaNV(user));
+    const maNV = String(user.ma_nv || '').trim();
+
+    // 1. Admin hoặc HCNS có thẩm quyền (Nhân viên HCNS, Nhân viên IT, Phó phòng HCNS)
+    const isAdmin = role === 'ADMIN';
+    const isHCNSQuyen =
+      bp === 'hcns' &&
+      (vt === 'nhân viên hcns' || vt === 'nhân viên it' || vt === 'phó phòng hcns');
+
+    // 2. Kinh doanh / Phó Giám đốc Kinh doanh
+    const isPGDKD =
+      bp === 'kinh doanh' &&
+      (vt === 'phó giám đốc kinh doanh' || vt.includes('phó giám đốc kinh doanh'));
+
+    return {
+      isToanQuyen: isAdmin || isHCNSQuyen,
+      isPGDKD,
+      phongPGD: phong,
+      maNV,
+    };
+  }
+
+  // Kiểm tra user có được PHÉP NHÌN THẤY đơn này trong danh sách không
+  function coQuyenXemDon(don: any): boolean {
+    if (!currentUser) return false;
+    const { isToanQuyen, isPGDKD, phongPGD, maNV } = getVaiTroUser(currentUser);
+
+    // Admin và HCNS được phân quyền: thấy tất cả đơn
+    if (isToanQuyen) return true;
+
+    // Phó Giám đốc Kinh doanh: chỉ thấy đơn của đúng Phòng mình phụ trách (VD: Kinh doanh 1 / Kinh doanh 2)
+    if (isPGDKD) {
+      const phongDon = norm(don.phong_kinh_doanh);
+      return phongPGD !== '' && phongDon === phongPGD;
+    }
+
+    // Các tài khoản còn lại (TVBH...): chỉ thấy đơn của chính tài khoản đó, không thấy của người khác
+    const maDon = String(don.ma_nv_tvbh || '').trim();
+    const tenDon = String(don.tu_van_ban_hang || '').trim();
+    return (maNV !== '' && maDon === maNV) || (maNV !== '' && tenDon.startsWith(maNV));
+  }
+
+  // Kiểm tra user có được PHÉP BẤM NÚT DUYỆT / TỪ CHỐI trên đơn này không
+  function coQuyenDuyetDon(don: any): boolean {
+    if (!currentUser) return false;
+    const { isToanQuyen, isPGDKD, phongPGD } = getVaiTroUser(currentUser);
+
+    // Admin và HCNS (Nhân viên HCNS, Nhân viên IT, Phó phòng HCNS)
+    if (isToanQuyen) return true;
+
+    // Phó Giám đốc Kinh doanh: chỉ duyệt đơn của đúng Phòng mình
+    if (isPGDKD) {
+      const phongDon = norm(don.phong_kinh_doanh);
+      return phongPGD !== '' && phongDon === phongPGD;
+    }
+
+    return false;
+  }
+
   // Mở form tạo đơn đặt hoa
   function handleOpenForm() {
     const sau1630 = checkSau16h30();
@@ -135,7 +224,6 @@ export default function QuanLyDatHoaPage() {
     setImageFile(null);
     setImagePreview('');
 
-    // Chỉ điền sẵn mã NV nếu người đang đăng nhập nằm trong danh sách TVBH
     const isCurrentUserTVBH = danhSachTVBH.some((tv) => tv.ma_nv === currentUser?.ma_nv);
 
     setForm({
@@ -177,7 +265,6 @@ export default function QuanLyDatHoaPage() {
     try {
       let uploadedImageUrl = '';
 
-      // Upload ảnh lên Supabase Storage nếu có
       if (imageFile) {
         const ext = imageFile.name.split('.').pop() || 'jpg';
         const fileName = `${Date.now()}_${form.hop_dong_so.replace(/[^a-zA-Z0-9]/g, '')}.${ext}`;
@@ -193,14 +280,14 @@ export default function QuanLyDatHoaPage() {
         uploadedImageUrl = pubUrl.publicUrl;
       }
 
-      // Tìm thông tin TVBH & Phòng kinh doanh của TVBH đó
+      // Tìm thông tin TVBH & đúng tên Phòng (Kinh doanh 1 / Kinh doanh 2)
       const tvbhObj = danhSachTVBH.find((x) => x.ma_nv === form.ma_nv_tvbh);
       const tenHienThiTVBH = tvbhObj ? `${tvbhObj.ma_nv} ${tvbhObj.ho_ten}` : form.ma_nv_tvbh;
-      const phongKD = tvbhObj?.bo_phan || tvbhObj?.phong_ban || 'Phòng Kinh Doanh';
+      const phongKD = layPhongCuaNV(tvbhObj) || layBoPhanCuaNV(tvbhObj) || 'Kinh doanh';
 
-      // Tìm Phó GĐKD phụ trách đúng Phòng Kinh Doanh đó để lấy ID Zalo Bot
+      // Tìm Phó Giám đốc Kinh doanh phụ trách đúng Phòng đó để lấy ID Zalo Bot
       const pgdPhuTrach = danhSachPGD.find(
-        (pgd) => (pgd.bo_phan || pgd.phong_ban || '').toLowerCase().trim() === phongKD.toLowerCase().trim()
+        (pgd) => norm(layPhongCuaNV(pgd)) === norm(phongKD)
       );
       const chatIdPGD =
         pgdPhuTrach?.id_chat_bot ||
@@ -227,7 +314,6 @@ export default function QuanLyDatHoaPage() {
 
       if (insertErr) throw insertErr;
 
-      // Format giờ giao xe gửi Zalo
       const giaoXeStr = new Date(form.ngay_gio_giao_xe).toLocaleString('vi-VN', {
         hour: '2-digit',
         minute: '2-digit',
@@ -257,7 +343,7 @@ export default function QuanLyDatHoaPage() {
       });
 
       alert(
-        `✅ Đã gửi yêu cầu đặt hoa cho khách ${form.ten_khach_hang}!\nChuyển duyệt tới Phó GĐKD phụ trách: ${phongKD}${
+        `✅ Đã gửi yêu cầu đặt hoa cho khách ${form.ten_khach_hang}!\nChuyển duyệt tới: ${phongKD}${
           pgdPhuTrach ? ` (${pgdPhuTrach.ho_ten})` : ''
         }`
       );
@@ -270,34 +356,10 @@ export default function QuanLyDatHoaPage() {
     }
   }
 
-  // Kiểm tra user hiện tại có quyền duyệt đơn hoa này không (Admin hoặc Phó GĐKD cùng phòng)
-  function coQuyenDuyetDon(don: any): boolean {
-    if (!currentUser) return false;
-
-    const userText = Object.values(currentUser)
-      .filter((v) => typeof v === 'string')
-      .join(' | ')
-      .toLowerCase();
-
-    // 1. Admin toàn quyền duyệt mọi phòng
-    if (userText.includes('admin')) return true;
-
-    // 2. Kiểm tra có phải Phó Giám Đốc không
-    const laPGD = userText.includes('phó giám đốc') || userText.includes('pgđ');
-    if (!laPGD) return false;
-
-    // 3. Đối chiếu đúng Phòng Kinh Doanh của Phó GĐKD với Phòng của TVBH tạo đơn
-    const phongCuaPGD = (currentUser.bo_phan || currentUser.phong_ban || '').toLowerCase().trim();
-    const phongCuaDon = (don.phong_kinh_doanh || '').toLowerCase().trim();
-
-    if (phongCuaDon === 'kinh doanh' && phongCuaPGD.includes('kinh doanh')) return true;
-    return phongCuaPGD !== '' && phongCuaPGD === phongCuaDon;
-  }
-
   // Xử lý Duyệt hoặc Từ chối đơn
   async function handleXuLyDuyet(don: any, trangThaiMoi: 'DA_DUYET' | 'TU_CHOI') {
     if (!coQuyenDuyetDon(don)) {
-      alert(`⛔ Bạn chỉ có quyền duyệt đơn đặt hoa thuộc phòng của mình (${currentUser?.bo_phan || 'Chưa phân phòng'})!`);
+      alert('⛔ Bạn không có quyền duyệt đơn đặt hoa này!');
       return;
     }
 
@@ -327,7 +389,6 @@ export default function QuanLyDatHoaPage() {
 
       if (error) throw error;
 
-      // Tìm UID Zalo của TVBH tạo đơn để báo kết quả duyệt
       const tvbhObj = danhSachTVBH.find((x) => x.ma_nv === don.ma_nv_tvbh);
       const uidTVBH = tvbhObj?.id_chat_bot || tvbhObj?.id_zalo_bot || '';
 
@@ -354,8 +415,11 @@ export default function QuanLyDatHoaPage() {
     }
   }
 
-  // Lọc danh sách hiển thị
-  const dsHienThi = danhSachHoa.filter((item) => {
+  // Bước 1: Lọc danh sách theo đúng quyền xem của tài khoản đang đăng nhập
+  const dsTheoQuyen = danhSachHoa.filter((item) => coQuyenXemDon(item));
+
+  // Bước 2: Lọc tiếp theo Tab trạng thái và ô Tìm kiếm
+  const dsHienThi = dsTheoQuyen.filter((item) => {
     const matchTab = tabTrangThai === 'TAT_CA' ? true : item.trang_thai === tabTrangThai;
     const kw = search.toLowerCase().trim();
     const matchSearch =
@@ -367,7 +431,7 @@ export default function QuanLyDatHoaPage() {
     return matchTab && matchSearch;
   });
 
-  const soLuongChuaDuyet = danhSachHoa.filter((x) => x.trang_thai === 'CHUA_DUYET').length;
+  const soLuongChuaDuyet = dsTheoQuyen.filter((x) => x.trang_thai === 'CHUA_DUYET').length;
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Segoe UI, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
@@ -453,7 +517,7 @@ export default function QuanLyDatHoaPage() {
             cursor: 'pointer',
           }}
         >
-          📋 TẤT CẢ ({danhSachHoa.length})
+          📋 TẤT CẢ ({dsTheoQuyen.length})
         </button>
       </div>
 
