@@ -53,23 +53,42 @@ export default function QuanLyDatHoaPage() {
   async function loadData() {
     setLoading(true);
     try {
-      // 1. Lấy danh sách nhân sự đang làm việc
-      const { data: nvData } = await supabase
+      // 1. Lấy toàn bộ nhân sự (tránh bị .neq loại mất các dòng có phan_quyen là NULL)
+      const { data: nvData, error: nvError } = await supabase
         .from('nhan_vien')
         .select('*')
-        .neq('phan_quyen', 'LOCKED')
         .order('ma_nv', { ascending: true });
 
+      if (nvError) {
+        console.error('Lỗi tải bảng nhan_vien:', nvError);
+      }
+
       if (nvData) {
-        // Lọc Tư vấn bán hàng
-        const tvbhList = nvData.filter((nv) =>
-          (nv.vi_tri || nv.chuc_vu || '').toLowerCase().includes('tư vấn bán hàng') ||
-          (nv.bo_phan || '').toLowerCase().includes('kinh doanh')
+        // Chỉ giữ nhân viên chưa bị khóa (LOCKED) và chưa nghỉ việc
+        const nvHoatDong = nvData.filter(
+          (nv) =>
+            nv.phan_quyen !== 'LOCKED' &&
+            nv.trang_thai !== 'LOCKED' &&
+            nv.tinh_trang !== 'Đã nghỉ việc'
         );
-        setDanhSachTVBH(tvbhList);
+
+        // Lọc đúng Vị trí là "Tư vấn bán hàng" (hoặc viết tắt TVBH)
+        const tvbhList = nvHoatDong.filter((nv) => {
+          const viTri = (nv.vi_tri || nv.chuc_vu || '').toLowerCase().trim();
+          return viTri.includes('tư vấn bán hàng') || viTri === 'tvbh';
+        });
+
+        // Nếu lọc theo vị trí vẫn trống thì fallback lấy theo bộ phận Kinh doanh để không bao giờ bị rỗng dropdown
+        setDanhSachTVBH(
+          tvbhList.length > 0
+            ? tvbhList
+            : nvHoatDong.filter((nv) =>
+                (nv.bo_phan || nv.phong_ban || '').toLowerCase().includes('kinh doanh')
+              )
+        );
 
         // Lọc Phó giám đốc kinh doanh (2 phòng)
-        const pgdList = nvData.filter((nv) => {
+        const pgdList = nvHoatDong.filter((nv) => {
           const vt = (nv.vi_tri || nv.chuc_vu || '').toLowerCase();
           return vt.includes('phó giám đốc') || vt.includes('pgđ');
         });
