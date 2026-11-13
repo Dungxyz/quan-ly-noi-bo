@@ -16,6 +16,8 @@ import {
 
 export default function TheoDoiXeDemoPage() {
   const { currentUser, kiemTraQuyen } = useAuth();
+  const [isMobile, setIsMobile] = useState(false);
+
   const [danhSach, setDanhSach] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, type: 'success', message: '' });
@@ -26,7 +28,15 @@ export default function TheoDoiXeDemoPage() {
   const [modalHistory, setModalHistory] = useState<{ open: boolean; xe: any }>({ open: false, xe: null });
 
   const [openModalThemXe, setOpenModalThemXe] = useState(false);
-    async function handleSaveXeDemo(duLieuXe: any) {
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  async function handleSaveXeDemo(duLieuXe: any) {
     try {
       const payload = {
         bien_so: duLieuXe.bien_so,
@@ -36,20 +46,20 @@ export default function TheoDoiXeDemoPage() {
         ghi_chu: duLieuXe.ghi_chu || null,
       };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('xe_demo')
         .insert([payload]);
 
       if (error) throw error;
 
       baoTin(`Đã thêm thành công xe ${duLieuXe.bien_so}!`);
-      loadData(); // Gọi đúng tên hàm loadData
+      loadData();
     } catch (err: any) {
       alert('Lỗi lưu xe: ' + (err?.message || JSON.stringify(err)));
     }
   }
-  
-  // Xử lý kiểm tra quyền: Hỗ trợ cả chuỗi phân quyền (VD: DEMO_VIEW,DEMO_HISTORY) và hàm kiemTraQuyen
+
+  // Xử lý kiểm tra quyền
   const quyenHienTai = currentUser?.phan_quyen || '';
   const isAdmin = quyenHienTai === 'ADMIN' || quyenHienTai === 'ALL';
 
@@ -175,18 +185,18 @@ export default function TheoDoiXeDemoPage() {
         backgroundColor: '#fff',
         borderRadius: '8px',
         border: '1px solid #e2e8f0',
-        padding: '16px',
+        padding: isMobile ? '14px' : '16px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        minHeight: '135px',
+        minHeight: isMobile ? 'auto' : '135px',
         position: 'relative',
       }}
     >
       <div>
         {/* Dòng 1: Biển số & Nút Lịch sử / Nút Xóa */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
           <div
             onClick={() => {
               if (canEdit) {
@@ -205,16 +215,15 @@ export default function TheoDoiXeDemoPage() {
             <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>{xe.bien_so}</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {/* QUYỀN XEM LỊCH SỬ (HISTORY) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {canViewHistory && (
               <button
                 type="button"
                 onClick={() => setModalHistory({ open: true, xe })}
                 style={{
-                  padding: '3px 8px',
+                  padding: '4px 9px',
                   border: '1px solid #0284c7',
-                  borderRadius: '4px',
+                  borderRadius: '5px',
                   backgroundColor: '#f0f9ff',
                   fontSize: '11px',
                   fontWeight: '600',
@@ -223,22 +232,22 @@ export default function TheoDoiXeDemoPage() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 ⏱ Lịch sử
               </button>
             )}
 
-            {/* QUYỀN XÓA XE (DELETE) */}
             {canDelete && (
               <button
                 type="button"
                 onClick={() => handleXoaXe(xe)}
                 title="Xóa xe này"
                 style={{
-                  padding: '3px 6px',
+                  padding: '4px 7px',
                   border: '1px solid #fecaca',
-                  borderRadius: '4px',
+                  borderRadius: '5px',
                   backgroundColor: '#fff',
                   fontSize: '11px',
                   color: '#dc2626',
@@ -252,7 +261,7 @@ export default function TheoDoiXeDemoPage() {
         </div>
 
         {/* Dòng 2: Dòng xe & ODO */}
-        <div style={{ fontSize: '13px', color: '#334155', fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ fontSize: '13px', color: '#334155', fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ color: '#94a3b8' }}>↗</span>
           <span>{xe.loai_xe}</span>
           <span style={{ color: '#64748b', fontWeight: 'normal' }}>
@@ -260,7 +269,7 @@ export default function TheoDoiXeDemoPage() {
           </span>
         </div>
 
-        {/* Dòng 3: Người nhận xe (Chỉ click sửa khi có quyền EDIT) */}
+        {/* Dòng 3: Người nhận xe */}
         <div
           onClick={() => {
             if (canEdit) {
@@ -310,14 +319,31 @@ export default function TheoDoiXeDemoPage() {
   );
 
   return (
-    <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
+    <div
+      style={{
+        padding: isMobile ? '14px 12px 24px 12px' : '24px',
+        backgroundColor: '#f8fafc',
+        minHeight: '100vh',
+        fontFamily: 'Segoe UI, sans-serif',
+        boxSizing: 'border-box',
+      }}
+    >
       <Toast toast={toast} onClose={() => setToast({ show: false, type: 'success', message: '' })} />
 
       {/* HEADER TOOLBAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '22px' }}>🚗</span>
-          <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'stretch' : 'center',
+          gap: '12px',
+          marginBottom: isMobile ? '18px' : '24px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: isMobile ? '20px' : '22px' }}>🚗</span>
+          <h1 style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
             THEO DÕI XE DEMO & CÔNG TÁC
           </h1>
           <span
@@ -326,22 +352,30 @@ export default function TheoDoiXeDemoPage() {
               color: '#fff',
               fontSize: '11px',
               fontWeight: 'bold',
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '10px',
+              whiteSpace: 'nowrap',
             }}
           >
             {danhSach.length} xe
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div
+          style={{
+            display: isMobile ? 'grid' : 'flex',
+            gridTemplateColumns: isMobile ? (canCreate ? '1fr 1fr' : '1fr') : undefined,
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
           {/* QUYỀN THÊM XE MỚI (CREATE) */}
           {canCreate && (
             <button
               type="button"
               onClick={() => setOpenModalThemXe(true)}
               style={{
-                padding: '7px 14px',
+                padding: isMobile ? '10px 10px' : '7px 14px',
                 borderRadius: '6px',
                 border: 'none',
                 backgroundColor: '#16a34a',
@@ -351,7 +385,9 @@ export default function TheoDoiXeDemoPage() {
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
+                whiteSpace: 'nowrap',
               }}
             >
               ➕ Thêm xe demo
@@ -362,7 +398,7 @@ export default function TheoDoiXeDemoPage() {
             type="button"
             onClick={loadData}
             style={{
-              padding: '7px 14px',
+              padding: isMobile ? '10px 10px' : '7px 14px',
               borderRadius: '6px',
               border: '1px solid #bae6fd',
               backgroundColor: '#fff',
@@ -372,7 +408,9 @@ export default function TheoDoiXeDemoPage() {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             🔄 Làm mới dữ liệu
@@ -385,8 +423,8 @@ export default function TheoDoiXeDemoPage() {
       ) : (
         <>
           {/* XE ĐANG ĐI CÔNG TÁC */}
-          <div style={{ marginBottom: '32px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <div style={{ marginBottom: '26px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <span style={{ fontSize: '16px', color: '#d97706' }}>⚙</span>
               <h2 style={{ fontSize: '14px', fontWeight: 'bold', color: '#d97706', margin: 0, textTransform: 'uppercase' }}>
                 ĐANG ĐI CÔNG TÁC
@@ -398,7 +436,7 @@ export default function TheoDoiXeDemoPage() {
             {xeDangDi.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Không có xe nào đang đi.</div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '12px' }}>
                 {xeDangDi.map((xe) => renderCardXe(xe, true))}
               </div>
             )}
@@ -406,7 +444,7 @@ export default function TheoDoiXeDemoPage() {
 
           {/* SẴN XE */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <span style={{ fontSize: '16px', color: '#16a34a' }}>🚘</span>
               <h2 style={{ fontSize: '14px', fontWeight: 'bold', color: '#16a34a', margin: 0, textTransform: 'uppercase' }}>
                 SẴN XE
@@ -415,7 +453,7 @@ export default function TheoDoiXeDemoPage() {
                 {xeSanXe.length}
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '12px' }}>
               {xeSanXe.map((xe) => renderCardXe(xe, false))}
             </div>
           </div>
@@ -442,11 +480,11 @@ export default function TheoDoiXeDemoPage() {
       )}
 
       {/* Modal thêm xe demo */}
-    <ModalThemXeDemo
-      isOpen={openModalThemXe}
-      onClose={() => setOpenModalThemXe(false)}
-      onSave={handleSaveXeDemo}
-    />
+      <ModalThemXeDemo
+        isOpen={openModalThemXe}
+        onClose={() => setOpenModalThemXe(false)}
+        onSave={handleSaveXeDemo}
+      />
     </div>
   );
 }
