@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '@/lib/supabase';
 
 export default function QuanLyDatHoaPage() {
+  // Nhận diện màn hình di động (< 768px)
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
   // Tab chính của phân hệ: 'DAT_HOA' | 'BAO_CAO'
   const [mainTab, setMainTab] = useState<'DAT_HOA' | 'BAO_CAO'>('DAT_HOA');
 
@@ -76,6 +74,12 @@ export default function QuanLyDatHoaPage() {
   }
 
   useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
     const now = new Date();
     const dauThang = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const cuoiThang = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -83,6 +87,8 @@ export default function QuanLyDatHoaPage() {
     setDenNgay(cuoiThang);
 
     loadData();
+
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   async function loadData() {
@@ -98,7 +104,6 @@ export default function QuanLyDatHoaPage() {
       }
 
       if (nvData && nvData.length > 0) {
-        // Tự động nhận diện tài khoản đang đăng nhập
         const allRawStrings: string[] = [];
         for (let i = 0; i < window.localStorage.length; i++) {
           const k = window.localStorage.key(i);
@@ -121,7 +126,6 @@ export default function QuanLyDatHoaPage() {
           setCurrentUser(detectedUser);
         }
 
-        // Lọc nhân sự đang hoạt động
         const nvHoatDong = nvData.filter(
           (nv) =>
             nv.phan_quyen !== 'LOCKED' &&
@@ -129,14 +133,12 @@ export default function QuanLyDatHoaPage() {
             norm(nv.tinh_trang) !== 'đã nghỉ việc'
         );
 
-        // Lấy đúng vị trí Tư vấn bán hàng / TVBH
         const tvbhList = nvHoatDong.filter((nv) => {
           const vt = norm(layViTriCuaNV(nv));
           return vt.includes('tư vấn bán hàng') || vt === 'tvbh';
         });
         setDanhSachTVBH(tvbhList);
 
-        // Lấy Phó Giám đốc Kinh doanh
         const pgdList = nvHoatDong.filter((nv) => {
           const bp = norm(layBoPhanCuaNV(nv));
           const vt = norm(layViTriCuaNV(nv));
@@ -217,7 +219,6 @@ export default function QuanLyDatHoaPage() {
     return false;
   }
 
-  // Mở form tạo đơn đặt hoa
   function handleOpenForm() {
     const sau1630 = checkSau16h30();
     setIsAfter1630(sau1630);
@@ -245,7 +246,6 @@ export default function QuanLyDatHoaPage() {
     setImagePreview(URL.createObjectURL(file));
   }
 
-  // Lưu đơn đặt hoa mới
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const sau1630HienTai = checkSau16h30();
@@ -354,7 +354,6 @@ export default function QuanLyDatHoaPage() {
     }
   }
 
-  // Xử lý Duyệt hoặc Từ chối đơn
   async function handleXuLyDuyet(don: any, trangThaiMoi: 'DA_DUYET' | 'TU_CHOI') {
     if (!coQuyenDuyetDon(don)) {
       alert('⛔ Bạn không có quyền duyệt đơn đặt hoa này!');
@@ -548,44 +547,65 @@ export default function QuanLyDatHoaPage() {
   }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Segoe UI, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+    <div
+      style={{
+        padding: isMobile ? '12px' : '20px',
+        fontFamily: 'Segoe UI, sans-serif',
+        backgroundColor: '#f8fafc',
+        minHeight: '100vh',
+        width: '100%',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
       {/* HEADER CHUNG CỦA PHÂN HỆ QUẢN LÝ ĐẶT HOA & THANH CHUYỂN 2 MỤC CON */}
       <div
         style={{
           backgroundColor: '#fff',
-          padding: '16px 20px',
+          padding: isMobile ? '14px' : '16px 20px',
           borderRadius: '12px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          marginBottom: '18px',
+          marginBottom: '16px',
           display: 'flex',
-          flexWrap: 'wrap',
+          flexDirection: isMobile ? 'column' : 'row',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '14px',
+          alignItems: isMobile ? 'stretch' : 'center',
+          gap: '12px',
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>
+          <h2 style={{ margin: 0, fontSize: isMobile ? '18px' : '20px', fontWeight: 'bold', color: '#0f172a' }}>
             🌸 QUẢN LÝ ĐẶT HOA
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
             Quy định: Đặt hoa trước <b>16h30</b>. Sau 16h30 bắt buộc đính kèm hình ảnh xác nhận để Phó GĐKD từng phòng duyệt.
           </p>
         </div>
 
         {/* 2 Tab phân hệ con: ĐẶT HOA GIAO XE & BÁO CÁO */}
-        <div style={{ display: 'flex', gap: '8px', backgroundColor: '#f1f5f9', padding: '5px', borderRadius: '10px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '6px',
+            backgroundColor: '#f1f5f9',
+            padding: '5px',
+            borderRadius: '10px',
+            width: isMobile ? '100%' : 'auto',
+          }}
+        >
           <button
             onClick={() => setMainTab('DAT_HOA')}
             style={{
-              padding: '9px 18px',
+              padding: isMobile ? '10px 8px' : '9px 18px',
               borderRadius: '8px',
               border: 'none',
               backgroundColor: mainTab === 'DAT_HOA' ? '#0284c7' : 'transparent',
               color: mainTab === 'DAT_HOA' ? '#fff' : '#334155',
               fontWeight: 'bold',
-              fontSize: '13px',
+              fontSize: isMobile ? '12px' : '13px',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
               boxShadow: mainTab === 'DAT_HOA' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
             }}
           >
@@ -594,14 +614,15 @@ export default function QuanLyDatHoaPage() {
           <button
             onClick={() => setMainTab('BAO_CAO')}
             style={{
-              padding: '9px 18px',
+              padding: isMobile ? '10px 8px' : '9px 18px',
               borderRadius: '8px',
               border: 'none',
               backgroundColor: mainTab === 'BAO_CAO' ? '#0284c7' : 'transparent',
               color: mainTab === 'BAO_CAO' ? '#fff' : '#334155',
               fontWeight: 'bold',
-              fontSize: '13px',
+              fontSize: isMobile ? '12px' : '13px',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
               boxShadow: mainTab === 'BAO_CAO' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
             }}
           >
@@ -616,76 +637,114 @@ export default function QuanLyDatHoaPage() {
       {mainTab === 'DAT_HOA' && (
         <>
           {/* Thanh công cụ tìm kiếm & Tạo phiếu */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'stretch' : 'center',
+              gap: '12px',
+              marginBottom: '16px',
+            }}
+          >
             {/* Tabs trạng thái */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: isMobile ? 'grid' : 'flex',
+                gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : undefined,
+                gap: '6px',
+              }}
+            >
               <button
                 onClick={() => setTabTrangThai('CHUA_DUYET')}
                 style={{
-                  padding: '8px 14px',
+                  padding: isMobile ? '9px 4px' : '8px 14px',
                   borderRadius: '8px',
                   border: '1px solid #f59e0b',
                   backgroundColor: tabTrangThai === 'CHUA_DUYET' ? '#fef3c7' : '#fff',
                   color: '#b45309',
                   fontWeight: 'bold',
-                  fontSize: '13px',
+                  fontSize: isMobile ? '11px' : '13px',
                   cursor: 'pointer',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                ⏳ CHƯA DUYỆT ({soLuongChuaDuyet})
+                ⏳ CHỜ ({soLuongChuaDuyet})
               </button>
               <button
                 onClick={() => setTabTrangThai('DA_DUYET')}
                 style={{
-                  padding: '8px 14px',
+                  padding: isMobile ? '9px 4px' : '8px 14px',
                   borderRadius: '8px',
                   border: '1px solid #10b981',
                   backgroundColor: tabTrangThai === 'DA_DUYET' ? '#d1fae5' : '#fff',
                   color: '#047857',
                   fontWeight: 'bold',
-                  fontSize: '13px',
+                  fontSize: isMobile ? '11px' : '13px',
                   cursor: 'pointer',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                ✅ ĐÃ DUYỆT ({soLuongDaDuyet})
+                ✅ DUYỆT ({soLuongDaDuyet})
               </button>
               <button
                 onClick={() => setTabTrangThai('TAT_CA')}
                 style={{
-                  padding: '8px 14px',
+                  padding: isMobile ? '9px 4px' : '8px 14px',
                   borderRadius: '8px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: tabTrangThai === 'TAT_CA' ? '#e2e8f0' : '#fff',
                   color: '#334155',
                   fontWeight: 'bold',
-                  fontSize: '13px',
+                  fontSize: isMobile ? '11px' : '13px',
                   cursor: 'pointer',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 📋 TẤT CẢ ({dsTheoQuyen.length})
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {/* Ô tìm kiếm + Nút tạo phiếu */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: '8px',
+                alignItems: 'stretch',
+              }}
+            >
               <input
                 type="text"
                 placeholder="🔍 Tìm KH, Số HĐ, TVBH, Biển số..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', width: '250px', backgroundColor: '#fff' }}
+                style={{
+                  padding: isMobile ? '10px 12px' : '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: isMobile ? '15px' : '13px',
+                  width: isMobile ? '100%' : '250px',
+                  backgroundColor: '#fff',
+                  boxSizing: 'border-box',
+                }}
               />
               {coQuyenTaoPhieu && (
                 <button
                   onClick={handleOpenForm}
                   style={{
-                    padding: '9px 16px',
+                    padding: isMobile ? '11px 16px' : '9px 16px',
                     backgroundColor: '#0284c7',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '8px',
                     fontWeight: 'bold',
-                    fontSize: '13px',
+                    fontSize: isMobile ? '14px' : '13px',
                     cursor: 'pointer',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   + Tạo Phiếu Đặt Hoa
@@ -694,104 +753,217 @@ export default function QuanLyDatHoaPage() {
             </div>
           </div>
 
-          {/* Bảng danh sách đơn hoa */}
-          <div style={{ backgroundColor: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9', color: '#334155', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px' }}>Dấu thời gian</th>
-                  <th style={{ padding: '12px' }}>Tư vấn bán hàng</th>
-                  <th style={{ padding: '12px' }}>Phòng KD</th>
-                  <th style={{ padding: '12px' }}>Tên khách hàng</th>
-                  <th style={{ padding: '12px' }}>Hợp đồng số</th>
-                  <th style={{ padding: '12px' }}>Số VIN/Biển số</th>
-                  <th style={{ padding: '12px' }}>Ngày/giờ giao xe</th>
-                  <th style={{ padding: '12px' }}>Ảnh / Ghi chú</th>
-                  <th style={{ padding: '12px' }}>Trạng thái / Duyệt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                      Đang tải danh sách đặt hoa...
-                    </td>
-                  </tr>
-                ) : dsHienThi.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                      Không có dữ liệu phù hợp.
-                    </td>
-                  </tr>
-                ) : (
-                  dsHienThi.map((row) => (
-                    <tr key={row.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                        {new Date(row.dau_thoi_gian).toLocaleString('vi-VN')}
+          {/* HIỂN THỊ DẠNG CARD TRÊN MOBILE / DẠNG BẢNG TRÊN DESKTOP */}
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {loading ? (
+                <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', textAlign: 'center', color: '#64748b' }}>
+                  Đang tải danh sách đặt hoa...
+                </div>
+              ) : dsHienThi.length === 0 ? (
+                <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '10px', textAlign: 'center', color: '#64748b' }}>
+                  Không có dữ liệu phù hợp.
+                </div>
+              ) : (
+                dsHienThi.map((row) => (
+                  <div
+                    key={row.id}
+                    style={{
+                      backgroundColor: '#fff',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                      borderLeft:
+                        row.trang_thai === 'DA_DUYET'
+                          ? '4px solid #16a34a'
+                          : row.trang_thai === 'TU_CHOI'
+                          ? '4px solid #dc2626'
+                          : '4px solid #f59e0b',
+                    }}
+                  >
+                    {/* Dòng 1: Tên khách + Phòng KD */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>
+                        👤 {row.ten_khach_hang}
+                      </div>
+                      <span style={{ padding: '3px 8px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                        {row.phong_kinh_doanh || '---'}
+                      </span>
+                    </div>
+
+                    {/* Thông tin chi tiết */}
+                    <div style={{ fontSize: '13px', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
+                      <div>
+                        <b>TVBH:</b> {row.tu_van_ban_hang}
+                      </div>
+                      <div>
+                        <b>Số HĐ:</b> {row.hop_dong_so} {row.so_vin_bien_so ? `| VIN/BS: ${row.so_vin_bien_so}` : ''}
+                      </div>
+                      <div style={{ color: '#0284c7', fontWeight: '600' }}>
+                        🚗 Giao xe: {new Date(row.ngay_gio_giao_xe).toLocaleString('vi-VN')}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>
+                        🕒 Đặt lúc: {new Date(row.dau_thoi_gian).toLocaleString('vi-VN')}{' '}
                         {row.dat_sau_16h30 && (
-                          <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold' }}>⚠️ Sau 16h30</div>
+                          <span style={{ color: '#dc2626', fontWeight: 'bold' }}>⚠️ (Sau 16h30)</span>
                         )}
-                      </td>
-                      <td style={{ padding: '12px', fontWeight: '600' }}>{row.tu_van_ban_hang}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ padding: '3px 8px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
-                          {row.phong_kinh_doanh || '---'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{row.ten_khach_hang}</td>
-                      <td style={{ padding: '12px' }}>{row.hop_dong_so}</td>
-                      <td style={{ padding: '12px' }}>{row.so_vin_bien_so || '---'}</td>
-                      <td style={{ padding: '12px', fontWeight: '600', color: '#0284c7' }}>
-                        {new Date(row.ngay_gio_giao_xe).toLocaleString('vi-VN')}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        {row.hinh_anh_url && (
-                          <a href={row.hinh_anh_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginBottom: '4px', color: '#0284c7', fontWeight: 'bold', fontSize: '12px' }}>
-                            🖼️ Xem ảnh đính kèm
-                          </a>
-                        )}
-                        <div style={{ color: '#475569', fontSize: '12px' }}>{row.ghi_chu || '---'}</div>
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        {row.trang_thai === 'CHUA_DUYET' ? (
-                          coQuyenDuyetDon(row) ? (
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button
-                                onClick={() => handleXuLyDuyet(row, 'DA_DUYET')}
-                                style={{ padding: '6px 10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                              >
-                                ✓ Duyệt
-                              </button>
-                              <button
-                                onClick={() => handleXuLyDuyet(row, 'TU_CHOI')}
-                                style={{ padding: '6px 10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                              >
-                                ✕ Từ chối
-                              </button>
-                            </div>
-                          ) : (
-                            <span style={{ color: '#d97706', fontWeight: 'bold', fontSize: '12px' }}>
-                              ⏳ Chờ PGĐ {row.phong_kinh_doanh} duyệt
-                            </span>
-                          )
-                        ) : row.trang_thai === 'DA_DUYET' ? (
-                          <div>
-                            <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '12px' }}>✅ Đã duyệt</span>
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>Bởi: {row.nguoi_duyet}</div>
+                      </div>
+                      {row.ghi_chu && (
+                        <div style={{ fontSize: '12px', color: '#475569', backgroundColor: '#f8fafc', padding: '6px 8px', borderRadius: '6px' }}>
+                          📝 {row.ghi_chu}
+                        </div>
+                      )}
+                      {row.hinh_anh_url && (
+                        <a
+                          href={row.hinh_anh_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#0284c7', fontWeight: 'bold', fontSize: '13px', marginTop: '2px', display: 'inline-block' }}
+                        >
+                          🖼️ Xem hình ảnh đính kèm
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Nút Duyệt / Trạng thái */}
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                      {row.trang_thai === 'CHUA_DUYET' ? (
+                        coQuyenDuyetDon(row) ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <button
+                              onClick={() => handleXuLyDuyet(row, 'DA_DUYET')}
+                              style={{ padding: '10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                              ✓ Duyệt đơn
+                            </button>
+                            <button
+                              onClick={() => handleXuLyDuyet(row, 'TU_CHOI')}
+                              style={{ padding: '10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                              ✕ Từ chối
+                            </button>
                           </div>
                         ) : (
-                          <div>
-                            <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '12px' }}>❌ Từ chối</span>
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>{row.ly_do_tu_choi}</div>
-                          </div>
-                        )}
+                          <span style={{ color: '#d97706', fontWeight: 'bold', fontSize: '12px' }}>
+                            ⏳ Chờ PGĐ {row.phong_kinh_doanh} duyệt
+                          </span>
+                        )
+                      ) : row.trang_thai === 'DA_DUYET' ? (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                          <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✅ Đã duyệt</span>
+                          <span style={{ color: '#64748b' }}>Bởi: {row.nguoi_duyet}</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '12px' }}>
+                          <span style={{ color: '#dc2626', fontWeight: 'bold' }}>❌ Từ chối</span>
+                          <div style={{ color: '#64748b', marginTop: '2px' }}>{row.ly_do_tu_choi}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            /* Bảng danh sách đơn hoa trên Desktop */
+            <div style={{ backgroundColor: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', color: '#334155', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '12px' }}>Dấu thời gian</th>
+                    <th style={{ padding: '12px' }}>Tư vấn bán hàng</th>
+                    <th style={{ padding: '12px' }}>Phòng KD</th>
+                    <th style={{ padding: '12px' }}>Tên khách hàng</th>
+                    <th style={{ padding: '12px' }}>Hợp đồng số</th>
+                    <th style={{ padding: '12px' }}>Số VIN/Biển số</th>
+                    <th style={{ padding: '12px' }}>Ngày/giờ giao xe</th>
+                    <th style={{ padding: '12px' }}>Ảnh / Ghi chú</th>
+                    <th style={{ padding: '12px' }}>Trạng thái / Duyệt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                        Đang tải danh sách đặt hoa...
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : dsHienThi.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                        Không có dữ liệu phù hợp.
+                      </td>
+                    </tr>
+                  ) : (
+                    dsHienThi.map((row) => (
+                      <tr key={row.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                          {new Date(row.dau_thoi_gian).toLocaleString('vi-VN')}
+                          {row.dat_sau_16h30 && (
+                            <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold' }}>⚠️ Sau 16h30</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px', fontWeight: '600' }}>{row.tu_van_ban_hang}</td>
+                        <td style={{ padding: '12px' }}>
+                          <span style={{ padding: '3px 8px', backgroundColor: '#e0f2fe', color: '#0369a1', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                            {row.phong_kinh_doanh || '---'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{row.ten_khach_hang}</td>
+                        <td style={{ padding: '12px' }}>{row.hop_dong_so}</td>
+                        <td style={{ padding: '12px' }}>{row.so_vin_bien_so || '---'}</td>
+                        <td style={{ padding: '12px', fontWeight: '600', color: '#0284c7' }}>
+                          {new Date(row.ngay_gio_giao_xe).toLocaleString('vi-VN')}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          {row.hinh_anh_url && (
+                            <a href={row.hinh_anh_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginBottom: '4px', color: '#0284c7', fontWeight: 'bold', fontSize: '12px' }}>
+                              🖼️ Xem ảnh đính kèm
+                            </a>
+                          )}
+                          <div style={{ color: '#475569', fontSize: '12px' }}>{row.ghi_chu || '---'}</div>
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          {row.trang_thai === 'CHUA_DUYET' ? (
+                            coQuyenDuyetDon(row) ? (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  onClick={() => handleXuLyDuyet(row, 'DA_DUYET')}
+                                  style={{ padding: '6px 10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                  ✓ Duyệt
+                                </button>
+                                <button
+                                  onClick={() => handleXuLyDuyet(row, 'TU_CHOI')}
+                                  style={{ padding: '6px 10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                  ✕ Từ chối
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ color: '#d97706', fontWeight: 'bold', fontSize: '12px' }}>
+                                ⏳ Chờ PGĐ {row.phong_kinh_doanh} duyệt
+                              </span>
+                            )
+                          ) : row.trang_thai === 'DA_DUYET' ? (
+                            <div>
+                              <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '12px' }}>✅ Đã duyệt</span>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>Bởi: {row.nguoi_duyet}</div>
+                            </div>
+                          ) : (
+                            <div>
+                              <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '12px' }}>❌ Từ chối</span>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>{row.ly_do_tu_choi}</div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 
@@ -804,18 +976,25 @@ export default function QuanLyDatHoaPage() {
           <div
             style={{
               backgroundColor: '#fff',
-              padding: '14px 16px',
+              padding: isMobile ? '12px' : '14px 16px',
               borderRadius: '10px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
               display: 'flex',
-              flexWrap: 'wrap',
+              flexDirection: isMobile ? 'column' : 'row',
               justifyContent: 'space-between',
-              alignItems: 'flex-end',
-              gap: '14px',
-              marginBottom: '18px',
+              alignItems: isMobile ? 'stretch' : 'flex-end',
+              gap: '12px',
+              marginBottom: '16px',
             }}
           >
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'flex-end' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, auto)',
+                gap: '10px',
+                alignItems: 'flex-end',
+              }}
+            >
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
                   Từ ngày
@@ -824,7 +1003,7 @@ export default function QuanLyDatHoaPage() {
                   type="date"
                   value={tuNgay}
                   onChange={(e) => setTuNgay(e.target.value)}
-                  style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -836,7 +1015,7 @@ export default function QuanLyDatHoaPage() {
                   type="date"
                   value={denNgay}
                   onChange={(e) => setDenNgay(e.target.value)}
-                  style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -848,7 +1027,7 @@ export default function QuanLyDatHoaPage() {
                   <select
                     value={chonPhongBC}
                     onChange={(e) => setChonPhongBC(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
+                    style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff', boxSizing: 'border-box' }}
                   >
                     <option value="TAT_CA">-- Tất cả phòng --</option>
                     <option value="Kinh doanh 1">Kinh doanh 1</option>
@@ -864,9 +1043,9 @@ export default function QuanLyDatHoaPage() {
                 <select
                   value={chonTrangThaiBC}
                   onChange={(e) => setChonTrangThaiBC(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff', boxSizing: 'border-box' }}
                 >
-                  <option value="TAT_CA">-- Tất cả trạng thái --</option>
+                  <option value="TAT_CA">-- Tất cả --</option>
                   <option value="DA_DUYET">✅ Đã duyệt</option>
                   <option value="CHUA_DUYET">⏳ Chưa duyệt</option>
                   <option value="TU_CHOI">❌ Từ chối</option>
@@ -877,7 +1056,7 @@ export default function QuanLyDatHoaPage() {
             <button
               onClick={handleExportCSV}
               style={{
-                padding: '9px 16px',
+                padding: isMobile ? '10px 16px' : '9px 16px',
                 backgroundColor: '#16a34a',
                 color: '#fff',
                 border: 'none',
@@ -895,48 +1074,63 @@ export default function QuanLyDatHoaPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '14px',
-              marginBottom: '20px',
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+              gap: '10px',
+              marginBottom: '16px',
             }}
           >
-            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>TỔNG PHIẾU ĐẶT HOA</div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#0f172a', marginTop: '4px' }}>{bcTongDon}</div>
+            <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>TỔNG PHIẾU HOA</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#0f172a', marginTop: '4px' }}>{bcTongDon}</div>
             </div>
 
-            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>ĐÃ DUYỆT CẤP HOA</div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#16a34a', marginTop: '4px' }}>{bcDaDuyet}</div>
+            <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>ĐÃ DUYỆT</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#16a34a', marginTop: '4px' }}>{bcDaDuyet}</div>
             </div>
 
-            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>ĐANG CHỜ DUYỆT</div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#d97706', marginTop: '4px' }}>{bcChuaDuyet}</div>
+            <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>CHỜ DUYỆT</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#d97706', marginTop: '4px' }}>{bcChuaDuyet}</div>
             </div>
 
-            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>TỪ CHỐI</div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#dc2626', marginTop: '4px' }}>{bcTuChoi}</div>
+            <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>TỪ CHỐI</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#dc2626', marginTop: '4px' }}>{bcTuChoi}</div>
             </div>
 
-            <div style={{ backgroundColor: '#fff', padding: '16px', borderRadius: '10px', borderLeft: '4px solid #9333ea', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>ĐẶT SAU 16H30</div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', color: '#7e22ce', marginTop: '4px' }}>{bcSau1630}</div>
+            <div
+              style={{
+                backgroundColor: '#fff',
+                padding: '14px',
+                borderRadius: '10px',
+                borderLeft: '4px solid #9333ea',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                gridColumn: isMobile ? 'span 2' : 'auto',
+              }}
+            >
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>ĐẶT SAU 16H30</div>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#7e22ce', marginTop: '4px' }}>{bcSau1630}</div>
             </div>
           </div>
 
           {/* 2 Bảng Tổng Hợp Theo Phòng KD & Theo TVBH */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-            {/* Bảng Tổng hợp theo Phòng Kinh Doanh */}
-            <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#0f172a' }}>🏢 Tổng hợp theo Phòng Kinh Doanh</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: '16px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
+              <h3 style={{ margin: '0 0 10px', fontSize: '14px', color: '#0f172a' }}>🏢 Tổng hợp theo Phòng Kinh Doanh</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '8px' }}>Phòng KD</th>
                     <th style={{ padding: '8px', textAlign: 'center' }}>Tổng</th>
-                    <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Đã duyệt</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Duyệt</th>
                     <th style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>Chờ</th>
                     <th style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>Sau 16h30</th>
                   </tr>
@@ -961,17 +1155,16 @@ export default function QuanLyDatHoaPage() {
               </table>
             </div>
 
-            {/* Bảng Thống kê theo Tư vấn bán hàng */}
-            <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxHeight: '320px', overflowY: 'auto' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#0f172a' }}>👨‍💼 Thống kê theo Tư vấn bán hàng</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+              <h3 style={{ margin: '0 0 10px', fontSize: '14px', color: '#0f172a' }}>👨‍💼 Thống kê theo Tư vấn bán hàng</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '8px' }}>Tư vấn bán hàng</th>
                     <th style={{ padding: '8px' }}>Phòng</th>
                     <th style={{ padding: '8px', textAlign: 'center' }}>Tổng</th>
-                    <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Đã duyệt</th>
-                    <th style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>Sau 16h30</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Duyệt</th>
+                    <th style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>Trễ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -983,7 +1176,7 @@ export default function QuanLyDatHoaPage() {
                     dsThongKeTVBH.map((tv) => (
                       <tr key={tv.ten} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px', fontWeight: '600' }}>{tv.ten}</td>
-                        <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>{tv.phong}</td>
+                        <td style={{ padding: '8px', fontSize: '11px', color: '#64748b' }}>{tv.phong}</td>
                         <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{tv.tong}</td>
                         <td style={{ padding: '8px', textAlign: 'center', color: '#16a34a', fontWeight: '600' }}>{tv.daDuyet}</td>
                         <td style={{ padding: '8px', textAlign: 'center', color: '#7e22ce' }}>{tv.tre1630}</td>
@@ -996,11 +1189,11 @@ export default function QuanLyDatHoaPage() {
           </div>
 
           {/* Bảng kê chi tiết */}
-          <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: '15px', color: '#0f172a' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
+            <h3 style={{ margin: '0 0 10px', fontSize: '14px', color: '#0f172a' }}>
               📋 Bảng kê chi tiết đơn đặt hoa ({duLieuBaoCao.length} phiếu)
             </h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '680px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                   <th style={{ padding: '10px' }}>STT</th>
@@ -1080,7 +1273,7 @@ export default function QuanLyDatHoaPage() {
           <div
             style={{
               width: '100%',
-              maxWidth: '480px',
+              maxWidth: isMobile ? '100%' : '480px',
               backgroundColor: '#fff',
               height: '100%',
               display: 'flex',
@@ -1090,7 +1283,7 @@ export default function QuanLyDatHoaPage() {
           >
             <div
               style={{
-                padding: '14px 20px',
+                padding: '14px 16px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1101,7 +1294,7 @@ export default function QuanLyDatHoaPage() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#475569' }}
+                  style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#475569', padding: '4px' }}
                 >
                   ✕
                 </button>
@@ -1112,7 +1305,7 @@ export default function QuanLyDatHoaPage() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  style={{ padding: '7px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0284c7', fontWeight: '600', cursor: 'pointer' }}
+                  style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#0284c7', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Huỷ
                 </button>
@@ -1120,21 +1313,20 @@ export default function QuanLyDatHoaPage() {
                   type="submit"
                   form="formDatHoa"
                   disabled={submitting}
-                  style={{ padding: '7px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#0284c7', color: '#fff', fontWeight: 'bold', cursor: submitting ? 'wait' : 'pointer' }}
+                  style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#0284c7', color: '#fff', fontWeight: 'bold', cursor: submitting ? 'wait' : 'pointer' }}
                 >
                   {submitting ? 'Đang lưu...' : 'Lưu'}
                 </button>
               </div>
             </div>
 
-            <form id="formDatHoa" onSubmit={handleSubmit} style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+            <form id="formDatHoa" onSubmit={handleSubmit} style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
               {isAfter1630 && (
                 <div style={{ padding: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '16px', color: '#b91c1c', fontSize: '13px' }}>
                   🚨 <b>Đã qua 16h30:</b> Vui lòng chụp hoặc tải lên hình ảnh xác nhận xe/hợp đồng bên dưới để được duyệt đơn hoa!
                 </div>
               )}
 
-              {/* Dấu thời gian */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Dấu thời gian <span style={{ color: '#ef4444' }}>*</span>
@@ -1143,11 +1335,10 @@ export default function QuanLyDatHoaPage() {
                   type="text"
                   readOnly
                   value={thoiGianHienTai}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '15px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {/* Tư vấn bán hàng */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Tư vấn bán hàng <span style={{ color: '#ef4444' }}>*</span>
@@ -1163,7 +1354,7 @@ export default function QuanLyDatHoaPage() {
                       padding: '10px 12px',
                       borderRadius: '6px',
                       border: '1px solid #cbd5e1',
-                      fontSize: '13px',
+                      fontSize: '15px',
                       backgroundColor: '#fff',
                       boxSizing: 'border-box',
                     }}
@@ -1192,7 +1383,7 @@ export default function QuanLyDatHoaPage() {
                       backgroundColor: '#f1f5f9',
                       color: '#334155',
                       fontWeight: '600',
-                      fontSize: '13px',
+                      fontSize: '15px',
                       cursor: 'not-allowed',
                       boxSizing: 'border-box',
                     }}
@@ -1200,7 +1391,6 @@ export default function QuanLyDatHoaPage() {
                 )}
               </div>
 
-              {/* Tên khách hàng */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Tên khách hàng <span style={{ color: '#ef4444' }}>*</span>
@@ -1211,11 +1401,10 @@ export default function QuanLyDatHoaPage() {
                   value={form.ten_khach_hang}
                   onChange={(e) => setForm({ ...form, ten_khach_hang: e.target.value })}
                   placeholder="Nhập họ tên khách hàng..."
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {/* Hợp đồng số */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Hợp đồng số <span style={{ color: '#ef4444' }}>*</span>
@@ -1226,11 +1415,10 @@ export default function QuanLyDatHoaPage() {
                   value={form.hop_dong_so}
                   onChange={(e) => setForm({ ...form, hop_dong_so: e.target.value })}
                   placeholder="VD: 014-1126-BPF"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {/* Số VIN/ Biển số */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Số VIN/ Biển số
@@ -1240,11 +1428,10 @@ export default function QuanLyDatHoaPage() {
                   value={form.so_vin_bien_so}
                   onChange={(e) => setForm({ ...form, so_vin_bien_so: e.target.value })}
                   placeholder="Nhập số khung VIN hoặc biển số..."
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {/* Ngày/giờ giao xe */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Ngày/giờ giao xe <span style={{ color: '#ef4444' }}>*</span>
@@ -1254,11 +1441,10 @@ export default function QuanLyDatHoaPage() {
                   required
                   value={form.ngay_gio_giao_xe}
                   onChange={(e) => setForm({ ...form, ngay_gio_giao_xe: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {/* Chụp hình gửi nếu đặt sau 16h30 */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: isAfter1630 ? '#dc2626' : '#475569', marginBottom: '6px' }}>
                   📷 Chụp hình / Tải ảnh xác nhận {isAfter1630 && <span style={{ color: '#ef4444' }}>* (Bắt buộc sau 16h30)</span>}
@@ -1269,19 +1455,18 @@ export default function QuanLyDatHoaPage() {
                   capture="environment"
                   required={isAfter1630}
                   onChange={handleFileChange}
-                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: isAfter1630 ? '1px solid #f87171' : '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: isAfter1630 ? '1px solid #f87171' : '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
                 />
                 {imagePreview && (
                   <img
                     src={imagePreview}
                     alt="Preview"
-                    style={{ marginTop: '10px', width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    style={{ marginTop: '10px', width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }}
                   />
                 )}
               </div>
 
-              {/* Ghi chú */}
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '24px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Ghi chú
                 </label>
@@ -1290,7 +1475,7 @@ export default function QuanLyDatHoaPage() {
                   value={form.ghi_chu}
                   onChange={(e) => setForm({ ...form, ghi_chu: e.target.value })}
                   placeholder="Nhập ghi chú nếu có..."
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', boxSizing: 'border-box' }}
                 />
               </div>
             </form>
