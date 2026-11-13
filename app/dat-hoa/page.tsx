@@ -24,6 +24,7 @@ export default function QuanLyDatHoaPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isAfter1630, setIsAfter1630] = useState(false);
+  const [thoiGianHienTai, setThoiGianHienTai] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
 
@@ -37,14 +38,8 @@ export default function QuanLyDatHoaPage() {
   });
 
   // State bộ lọc của tab BÁO CÁO
-  const [tuNgay, setTuNgay] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  });
-  const [denNgay, setDenNgay] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-  });
+  const [tuNgay, setTuNgay] = useState<string>('');
+  const [denNgay, setDenNgay] = useState<string>('');
   const [chonPhongBC, setChonPhongBC] = useState<string>('TAT_CA');
   const [chonTrangThaiBC, setChonTrangThaiBC] = useState<string>('TAT_CA');
 
@@ -81,6 +76,12 @@ export default function QuanLyDatHoaPage() {
   }
 
   useEffect(() => {
+    const now = new Date();
+    const dauThang = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const cuoiThang = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    setTuNgay(dauThang);
+    setDenNgay(cuoiThang);
+
     loadData();
   }, []);
 
@@ -220,6 +221,7 @@ export default function QuanLyDatHoaPage() {
   function handleOpenForm() {
     const sau1630 = checkSau16h30();
     setIsAfter1630(sau1630);
+    setThoiGianHienTai(new Date().toLocaleString('vi-VN'));
     setImageFile(null);
     setImagePreview('');
 
@@ -435,9 +437,9 @@ export default function QuanLyDatHoaPage() {
   // DỮ LIỆU CHO TAB 2: BÁO CÁO
   // =========================================================================
   const duLieuBaoCao = dsTheoQuyen.filter((item) => {
-    const ngayTao = new Date(item.dau_thoi_gian).toISOString().split('T')[0];
-    if (tuNgay && ngayTao < tuNgay) return false;
-    if (denNgay && ngayTao > denNgay) return false;
+    const ngayTao = item.dau_thoi_gian ? new Date(item.dau_thoi_gian).toISOString().split('T')[0] : '';
+    if (tuNgay && ngayTao && ngayTao < tuNgay) return false;
+    if (denNgay && ngayTao && ngayTao > denNgay) return false;
 
     if (chonPhongBC !== 'TAT_CA' && norm(item.phong_kinh_doanh) !== norm(chonPhongBC)) {
       return false;
@@ -1140,7 +1142,7 @@ export default function QuanLyDatHoaPage() {
                 <input
                   type="text"
                   readOnly
-                  value={new Date().toLocaleString('vi-VN')}
+                  value={thoiGianHienTai}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '13px', boxSizing: 'border-box' }}
                 />
               </div>
