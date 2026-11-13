@@ -73,10 +73,13 @@ export default function QuanLyDatHoaPage() {
             nv.tinh_trang !== 'Đã nghỉ việc'
         );
 
-        // Lọc đúng duy nhất cột Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
+        // 2. Quét tất cả các cột để lấy đúng những người có Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
         const tvbhList = nvHoatDong.filter((nv) => {
-          const viTri = (nv.vi_tri || nv.chuc_vu || '').toLowerCase().trim();
-          return viTri === 'Tư vấn bán hàng' || viTri === 'TVBH';
+          const allText = Object.values(nv)
+            .filter((val) => typeof val === 'string')
+            .join(' | ')
+            .toLowerCase();
+          return allText.includes('tư vấn bán hàng') || allText.includes('tvbh');
         });
 
         setDanhSachTVBH(tvbhList);
