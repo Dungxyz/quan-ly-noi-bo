@@ -73,28 +73,13 @@ export default function QuanLyDatHoaPage() {
             nv.tinh_trang !== 'Đã nghỉ việc'
         );
 
-        // Quét tất cả giá trị trong dòng nhân viên để tìm người có vị trí "Tư vấn bán hàng"
+        // Lọc đúng duy nhất cột Vị trí là "Tư vấn bán hàng" hoặc "TVBH"
         const tvbhList = nvHoatDong.filter((nv) => {
-          const allText = Object.values(nv)
-            .filter((val) => typeof val === 'string')
-            .join(' ')
-            .toLowerCase();
-          return allText.includes('Tư vấn bán hàng') || allText.includes('TVBH');
+          const viTri = (nv.vi_tri || nv.chuc_vu || '').toLowerCase().trim();
+          return viTri === 'Tư vấn bán hàng' || viTri === 'TVBH';
         });
 
-        // Nếu không tìm thấy chữ "tư vấn bán hàng", lấy tất cả nhân viên bộ phận Kinh doanh
-        /*const dsCuoiCung =
-          tvbhList.length > 0
-            ? tvbhList
-            : nvHoatDong.filter((nv) => {
-                const allText = Object.values(nv)
-                  .filter((val) => typeof val === 'string')
-                  .join(' ')
-                  .toLowerCase();
-                return allText.includes('kinh doanh');
-              });*/
-
-        setDanhSachTVBH(dsCuoiCung.length > 0 ? dsCuoiCung : nvHoatDong);
+        setDanhSachTVBH(tvbhList);
 
         // Lọc Phó giám đốc kinh doanh (2 phòng)
         const pgdList = nvHoatDong.filter((nv) => {
