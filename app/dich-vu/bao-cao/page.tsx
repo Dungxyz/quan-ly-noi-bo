@@ -6,6 +6,17 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function BaoCaoDichVuPage() {
   const { currentUser, kiemTraQuyen } = useAuth();
+  const [screenWidth, setScreenWidth] = useState(1200);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isTinyMobile = screenWidth < 420;
+  const isMobile = screenWidth < 768;
 
   // Kiểm tra quyền truy cập phân hệ Báo cáo dịch vụ
   const role = currentUser?.phan_quyen || '';
@@ -18,7 +29,7 @@ export default function BaoCaoDichVuPage() {
   const [denNgay, setDenNgay] = useState('');
   const [coVan, setCoVan] = useState('');
   const [hangMuc, setHangMuc] = useState('');
-  
+
   const [danhSachCoVan, setDanhSachCoVan] = useState<any[]>([]);
   const [dsHangMuc, setDsHangMuc] = useState<any[]>([]);
   const [duLieuBaoCao, setDuLieuBaoCao] = useState<any[]>([]);
@@ -125,7 +136,7 @@ export default function BaoCaoDichVuPage() {
       return;
     }
     if (duLieuHienThi.length === 0) return alert('Không có dữ liệu để xuất!');
-    
+
     const headers = ['NO', 'Thời Gian', 'Biển Số', 'Khách Hàng', 'Cố Vấn Viên', 'Hạng Mục Thực Hiện', 'Trạng Thái Hẹn', 'Số Điện Thoại', 'Ghi Chú'];
     const rows = duLieuHienThi.map((r, idx) => {
       const tenCV = r.co_van_vien || r.ten_co_van || '';
@@ -158,7 +169,7 @@ export default function BaoCaoDichVuPage() {
     document.body.removeChild(link);
   }
 
-  // 5. Xuất Báo Cáo Ngày đúng mẫu Excel đại lý (STT tự tăng + Font lớn)
+  // 5. Xuất Báo Cáo Ngày đúng mẫu Excel đại lý
   function handleXuatBaoCaoNgayMau() {
     if (!canMau) {
       alert('Tài khoản của bạn không có quyền tải Báo cáo ngày (Mẫu)!');
@@ -270,49 +281,95 @@ export default function BaoCaoDichVuPage() {
     );
   }
 
+  const responsiveFilterInput = {
+    ...filterInputStyle,
+    fontSize: isMobile ? '14px' : '12px',
+    padding: isMobile ? '9px 10px' : '7px 10px',
+  };
+
   return (
-    <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-        
+    <div
+      style={{
+        padding: isMobile ? '14px 12px 24px 12px' : '24px',
+        backgroundColor: '#f8fafc',
+        minHeight: '100vh',
+        fontFamily: 'Segoe UI, sans-serif',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          padding: isMobile ? '16px 14px' : '20px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}
+      >
         {/* HEADER TOOLBAR */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 'bold', color: '#0284c7', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px',
+            marginBottom: '16px',
+          }}
+        >
+          <h2 style={{ fontSize: isMobile ? '14px' : '15px', fontWeight: 'bold', color: '#0284c7', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>📍</span> TRÍCH XUẤT BÁO CÁO DỊCH VỤ
           </h2>
-          <span style={{ backgroundColor: '#0f172a', color: '#fff', fontSize: '11px', fontWeight: 'bold', padding: '4px 12px', borderRadius: '12px' }}>
+          <span
+            style={{
+              backgroundColor: '#0f172a',
+              color: '#fff',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              padding: '4px 12px',
+              borderRadius: '12px',
+              whiteSpace: 'nowrap',
+            }}
+          >
             Kết quả lọc: {duLieuHienThi.length} xe
           </span>
         </div>
 
-        {/* INPUT BỘ LỌC 4 Ô */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '16px' }}>
-          <div>
+        {/* INPUT BỘ LỌC */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: isTinyMobile ? '1fr' : isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+            gap: isMobile ? '10px' : '14px',
+            marginBottom: '16px',
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
             <label style={labelStyle}>Từ ngày</label>
             <input
               type="date"
               value={tuNgay}
               onChange={(e) => setTuNgay(e.target.value)}
-              style={filterInputStyle}
+              style={responsiveFilterInput}
             />
           </div>
 
-          <div>
+          <div style={{ minWidth: 0 }}>
             <label style={labelStyle}>Đến ngày</label>
             <input
               type="date"
               value={denNgay}
               onChange={(e) => setDenNgay(e.target.value)}
-              style={filterInputStyle}
+              style={responsiveFilterInput}
             />
           </div>
 
-          {/* Cố vấn viên */}
-          <div>
+          <div style={{ minWidth: 0 }}>
             <label style={labelStyle}>Cố vấn viên</label>
             <select
               value={coVan}
               onChange={(e) => setCoVan(e.target.value)}
-              style={filterInputStyle}
+              style={responsiveFilterInput}
             >
               <option value="">-- Tất cả cố vấn --</option>
               {danhSachCoVan.map((nv) => (
@@ -323,13 +380,12 @@ export default function BaoCaoDichVuPage() {
             </select>
           </div>
 
-          {/* Hạng mục */}
-          <div>
+          <div style={{ minWidth: 0 }}>
             <label style={labelStyle}>Hạng mục</label>
             <select
               value={hangMuc}
               onChange={(e) => setHangMuc(e.target.value)}
-              style={filterInputStyle}
+              style={responsiveFilterInput}
             >
               <option value="">-- Tất cả hạng mục --</option>
               {dsHangMuc.map((item, idx) => (
@@ -342,68 +398,82 @@ export default function BaoCaoDichVuPage() {
         </div>
 
         {/* CÁC NÚT THAO TÁC */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            marginBottom: '18px',
+          }}
+        >
           <button
             type="button"
             onClick={() => handleLoc()}
             disabled={loading}
             style={{
+              flex: isMobile ? '1 1 auto' : 'none',
               backgroundColor: '#0284c7',
               color: '#fff',
               border: 'none',
-              padding: '8px 16px',
+              padding: isMobile ? '10px 14px' : '8px 16px',
               borderRadius: '6px',
               fontWeight: 'bold',
               fontSize: '13px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
             <span>🔍</span> {loading ? 'Đang lọc...' : 'Lọc'}
           </button>
 
-          {/* Chỉ hiển thị nút Xuất Excel khi có quyền BC_EXCEL */}
           {canExcel && (
             <button
               type="button"
               onClick={handleXuatExcel}
               style={{
+                flex: isMobile ? '1 1 auto' : 'none',
                 backgroundColor: '#16a34a',
                 color: '#fff',
                 border: 'none',
-                padding: '8px 16px',
+                padding: isMobile ? '10px 14px' : '8px 16px',
                 borderRadius: '6px',
                 fontWeight: 'bold',
                 fontSize: '13px',
                 cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
+                whiteSpace: 'nowrap',
               }}
             >
               <span>📗</span> Xuất Excel
             </button>
           )}
 
-          {/* Chỉ hiển thị nút BC Ngày (Mẫu) khi có quyền BC_MAU */}
           {canMau && (
             <button
               type="button"
               onClick={handleXuatBaoCaoNgayMau}
               style={{
+                flex: isMobile ? '1 1 100%' : 'none',
                 backgroundColor: '#eab308',
                 color: '#000',
                 border: 'none',
-                padding: '8px 16px',
+                padding: isMobile ? '10px 14px' : '8px 16px',
                 borderRadius: '6px',
                 fontWeight: 'bold',
                 fontSize: '13px',
                 cursor: 'pointer',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
+                whiteSpace: 'nowrap',
               }}
             >
               <span>📑</span> BC Ngày (Mẫu)
@@ -411,31 +481,94 @@ export default function BaoCaoDichVuPage() {
           )}
         </div>
 
-        {/* BẢNG DỮ LIỆU BÁO CÁO */}
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '12px' }}>
-                <th style={{ padding: '10px 12px' }}>NO.</th>
-                <th style={{ padding: '10px 12px' }}>THỜI GIAN</th>
-                <th style={{ padding: '10px 12px' }}>BIỂN SỐ</th>
-                <th style={{ padding: '10px 12px' }}>KHÁCH HÀNG</th>
-                <th style={{ padding: '10px 12px' }}>CỐ VẤN VIÊN</th>
-                <th style={{ padding: '10px 12px' }}>HẠNG MỤC THỰC HIỆN</th>
-                <th style={{ padding: '10px 12px' }}>TRẠNG THÁI HẸN</th>
-                <th style={{ padding: '10px 12px' }}>SỐ ĐIỆN THOẠI</th>
-                <th style={{ padding: '10px 12px' }}>GHI CHÚ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {duLieuBaoCao.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                    {loading ? 'Đang trích xuất dữ liệu...' : 'Không có dữ liệu trong khoảng thời gian này.'}
-                  </td>
+        {/* HIỂN THỊ KẾT QUẢ BÁO CÁO */}
+        {duLieuHienThi.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px' }}>
+            {loading ? 'Đang trích xuất dữ liệu...' : 'Không có dữ liệu trong khoảng thời gian này.'}
+          </div>
+        ) : isMobile ? (
+          /* GIAO DIỆN THẺ (CARD) DỌC TRÊN ĐIỆN THOẠI */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {duLieuHienThi.map((r, index) => {
+              const coVanHienThi = r.co_van_vien || r.ten_co_van || '---';
+              const hangMucHienThi = r.hang_muc_thuc_hien || r.hang_muc || '---';
+              const trangThaiHienThi = r.trang_thai_hen || r.trang_thai || '24H';
+
+              return (
+                <div
+                  key={r.no_id || index}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderLeft: '4px solid #0284c7',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  {/* Hàng 1: STT + Biển số + Hạng mục & Trạng thái */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                        #{r.no_id || index + 1}
+                      </span>
+                      <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0284c7' }}>
+                        {r.bien_so}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <span style={{ backgroundColor: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                        {hangMucHienThi}
+                      </span>
+                      <span style={{ backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '2px 7px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                        {trangThaiHienThi}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Hàng 2: Khách hàng + SĐT */}
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', marginBottom: '4px' }}>
+                    👤 {r.ten_khach_hang || '---'}
+                    {r.so_dien_thoai ? <span style={{ fontWeight: 'normal', color: '#475569' }}> • 📞 {r.so_dien_thoai}</span> : ''}
+                  </div>
+
+                  {/* Hàng 3: Cố vấn + Thời gian */}
+                  <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div>🧑‍💼 CVDV: <strong>{coVanHienThi}</strong></div>
+                    <div>
+                      🕒 {r.thoi_gian ? `${new Date(r.thoi_gian).toLocaleTimeString('vi-VN')} ${new Date(r.thoi_gian).toLocaleDateString('vi-VN')}` : '---'}
+                    </div>
+                  </div>
+
+                  {/* Hàng 4: Ghi chú (nếu có) */}
+                  {r.ghi_chu && (
+                    <div style={{ fontSize: '12px', color: '#475569', backgroundColor: '#f8fafc', padding: '5px 8px', borderRadius: '4px', marginTop: '6px' }}>
+                      📝 {r.ghi_chu}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* BẢNG DỮ LIỆU ĐẦY ĐỦ TRÊN MÁY TÍNH */
+          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '12px' }}>
+                  <th style={{ padding: '10px 12px' }}>NO.</th>
+                  <th style={{ padding: '10px 12px' }}>THỜI GIAN</th>
+                  <th style={{ padding: '10px 12px' }}>BIỂN SỐ</th>
+                  <th style={{ padding: '10px 12px' }}>KHÁCH HÀNG</th>
+                  <th style={{ padding: '10px 12px' }}>CỐ VẤN VIÊN</th>
+                  <th style={{ padding: '10px 12px' }}>HẠNG MỤC THỰC HIỆN</th>
+                  <th style={{ padding: '10px 12px' }}>TRẠNG THÁI HẸN</th>
+                  <th style={{ padding: '10px 12px' }}>SỐ ĐIỆN THOẠI</th>
+                  <th style={{ padding: '10px 12px' }}>GHI CHÚ</th>
                 </tr>
-              ) : (
-                duLieuHienThi.map((r, index) => {
+              </thead>
+              <tbody>
+                {duLieuHienThi.map((r, index) => {
                   const coVanHienThi = r.co_van_vien || r.ten_co_van || '---';
                   const hangMucHienThi = r.hang_muc_thuc_hien || r.hang_muc || '---';
                   const trangThaiHienThi = r.trang_thai_hen || r.trang_thai || '24H';
@@ -443,10 +576,10 @@ export default function BaoCaoDichVuPage() {
                   return (
                     <tr key={r.no_id || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px 12px', fontWeight: 'bold' }}>{r.no_id || index + 1}</td>
-                      <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                      <td style={{ padding: '10px 12px', color: '#64748b', whiteSpace: 'nowrap' }}>
                         {r.thoi_gian ? new Date(r.thoi_gian).toLocaleTimeString('vi-VN') + ' ' + new Date(r.thoi_gian).toLocaleDateString('vi-VN') : '---'}
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#0284c7', fontWeight: 'bold' }}>
+                      <td style={{ padding: '10px 12px', color: '#0284c7', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                         {r.bien_so}
                       </td>
                       <td style={{ padding: '10px 12px', fontWeight: '600', color: '#0f172a' }}>
@@ -471,12 +604,11 @@ export default function BaoCaoDichVuPage() {
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

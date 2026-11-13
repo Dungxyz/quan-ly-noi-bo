@@ -6,6 +6,17 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function TiepNhanXePage() {
   const { currentUser, kiemTraQuyen } = useAuth();
+  const [screenWidth, setScreenWidth] = useState(1200);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isSmallMobile = screenWidth < 640;
+  const isTabletOrMobile = screenWidth < 900;
 
   // Kiểm tra quyền hạn phân hệ Tiếp nhận xe
   const role = currentUser?.phan_quyen || '';
@@ -26,7 +37,7 @@ export default function TiepNhanXePage() {
   const [modalEditOpen, setModalEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<any>(null);
   const [savingEdit, setSavingEdit] = useState(false);
-  const [oldCoVan, setOldCoVan] = useState<string>(''); // Lưu cố vấn cũ để đối chiếu khi sửa
+  const [oldCoVan, setOldCoVan] = useState<string>('');
 
   // Hàm lấy ID Chat Bot của cố vấn từ danh sách nhân viên
   function layIdChatBot(tenHoacMaCV: string): string {
@@ -38,7 +49,6 @@ export default function TiepNhanXePage() {
       return (ma && searchStr.includes(ma)) || (ten && searchStr.includes(ten));
     });
     if (!cvObj) return '';
-    // Kiểm tra linh hoạt tên cột lưu ID bot trong database
     return cvObj.uid_zalo || cvObj.id_doan_chat_bot || '';
   }
 
@@ -199,7 +209,7 @@ export default function TiepNhanXePage() {
         { onConflict: 'bien_so' }
       );
 
-        // 3. Lấy ID Chat Bot của cố vấn được chọn và gửi thông báo
+      // 3. Lấy ID Chat Bot của cố vấn được chọn và gửi thông báo
       const chatIdCVDV = layIdChatBot(form.co_van_vien);
 
       try {
@@ -215,21 +225,7 @@ export default function TiepNhanXePage() {
         console.warn('Lỗi gửi Zalo Bot:', botErr);
       }
 
-      // 4. Bắn Zalo Bot qua API Next.js
-      try {
-        await fetch('/api/zalo-bot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...payload,
-            chat_id: chatIdCVDV,
-          }),
-        });
-      } catch (botErr) {
-        console.warn('Lỗi gửi Zalo Bot:', botErr);
-      }
-
-      // 5. Làm mới form
+      // 4. Làm mới form
       setForm({
         bien_so: '',
         ten_khach_hang: '',
@@ -269,7 +265,7 @@ export default function TiepNhanXePage() {
     return false;
   }
 
-  /// 5. Mở modal Sửa
+  // 5. Mở modal Sửa
   function handleOpenEdit(row: any) {
     if (!canEdit) {
       alert('Tài khoản của bạn không có quyền chỉnh sửa tiếp nhận xe!');
@@ -279,7 +275,7 @@ export default function TiepNhanXePage() {
       alert('Lượt tiếp nhận này đã bị khóa (sau 18h00 hoặc đã qua ngày), không thể sửa!');
       return;
     }
-    setOldCoVan(row.co_van_vien || ''); // Ghi nhớ cố vấn ban đầu
+    setOldCoVan(row.co_van_vien || '');
     setEditRow({ ...row });
     setModalEditOpen(true);
   }
@@ -305,7 +301,6 @@ export default function TiepNhanXePage() {
 
       if (error) throw error;
 
-      // Đồng bộ lại thông tin cố vấn sang bảng khách hàng
       await supabase
         .from('dich_vu_khach_hang')
         .update({
@@ -317,7 +312,6 @@ export default function TiepNhanXePage() {
         })
         .eq('bien_so', editRow.bien_so);
 
-      // Kiểm tra nếu có sự thay đổi Cố vấn viên -> Gửi tin nhắn điều chuyển cho cố vấn mới
       if (editRow.co_van_vien && editRow.co_van_vien !== oldCoVan) {
         const chatIdMoi = layIdChatBot(editRow.co_van_vien);
         try {
@@ -333,7 +327,7 @@ export default function TiepNhanXePage() {
               trang_thai_hen: editRow.trang_thai_hen,
               ghi_chu: editRow.ghi_chu,
               chat_id: chatIdMoi,
-              co_van_cu: oldCoVan, // Truyền tên cố vấn cũ sang API
+              co_van_cu: oldCoVan,
             }),
           });
         } catch (botErr) {
@@ -401,19 +395,44 @@ export default function TiepNhanXePage() {
     );
   }
 
+  const responsiveInputStyle = {
+    ...inputStyle,
+    fontSize: isSmallMobile ? '15px' : '13px',
+    padding: isSmallMobile ? '10px 11px' : '8px 10px',
+  };
+
   return (
-    <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '360px 1fr', gap: '20px', backgroundColor: '#f8fafc', minHeight: '100vh', boxSizing: 'border-box' }}>
-      
-      {/* FORM BÊN TRÁI: NHẬP TIẾP NHẬN */}
-      <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', height: 'fit-content', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-        <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div
+      style={{
+        padding: isSmallMobile ? '14px 12px 24px 12px' : '20px',
+        display: 'grid',
+        gridTemplateColumns: isTabletOrMobile ? '1fr' : '360px 1fr',
+        gap: isSmallMobile ? '16px' : '20px',
+        backgroundColor: '#f8fafc',
+        minHeight: '100vh',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* FORM NHẬP TIẾP NHẬN */}
+      <div
+        style={{
+          backgroundColor: '#fff',
+          padding: isSmallMobile ? '16px 14px' : '20px',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          height: 'fit-content',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          minWidth: 0,
+        }}
+      >
+        <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ color: '#0284c7' }}>⊕</span> THÔNG TIN XE VÀO DỊCH VỤ
         </h3>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={labelStyle}>Biển số *</label>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Biển số *</label>
               {dangTraCuu && <span style={{ fontSize: '11px', color: '#0284c7' }}>Đang tra cứu...</span>}
             </div>
             <input
@@ -423,11 +442,17 @@ export default function TiepNhanXePage() {
               onChange={(e) => setForm({ ...form, bien_so: e.target.value.toUpperCase() })}
               onBlur={handleBienSoBlur}
               required
-              style={{ ...inputStyle, textTransform: 'uppercase', fontWeight: 'bold', fontSize: '14px', color: '#0284c7' }}
+              style={{
+                ...responsiveInputStyle,
+                textTransform: 'uppercase',
+                fontWeight: 'bold',
+                fontSize: '15px',
+                color: '#0284c7',
+              }}
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1.2fr 1fr', gap: '10px' }}>
             <div>
               <label style={labelStyle}>Khách hàng *</label>
               <input
@@ -436,7 +461,7 @@ export default function TiepNhanXePage() {
                 value={form.ten_khach_hang}
                 onChange={(e) => setForm({ ...form, ten_khach_hang: e.target.value })}
                 required
-                style={inputStyle}
+                style={responsiveInputStyle}
               />
             </div>
             <div>
@@ -446,7 +471,7 @@ export default function TiepNhanXePage() {
                 placeholder="09xxxxxxxx"
                 value={form.so_dien_thoai}
                 onChange={(e) => setForm({ ...form, so_dien_thoai: e.target.value })}
-                style={inputStyle}
+                style={responsiveInputStyle}
               />
             </div>
           </div>
@@ -457,7 +482,7 @@ export default function TiepNhanXePage() {
               value={form.co_van_vien}
               onChange={(e) => setForm({ ...form, co_van_vien: e.target.value })}
               required
-              style={inputStyle}
+              style={responsiveInputStyle}
             >
               <option value="">-- Chọn cố vấn --</option>
               {danhSachCoVan.map((cv) => (
@@ -468,14 +493,14 @@ export default function TiepNhanXePage() {
             </select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1.2fr 1fr', gap: '10px' }}>
             <div>
               <label style={labelStyle}>Hạng mục thực hiện *</label>
               <select
                 value={form.hang_muc_thuc_hien}
                 onChange={(e) => setForm({ ...form, hang_muc_thuc_hien: e.target.value })}
                 required
-                style={inputStyle}
+                style={responsiveInputStyle}
               >
                 <option value="">-- Chọn hạng mục --</option>
                 {dsHangMuc.map((item, idx) => (
@@ -492,7 +517,7 @@ export default function TiepNhanXePage() {
                 value={form.trang_thai_hen}
                 onChange={(e) => setForm({ ...form, trang_thai_hen: e.target.value })}
                 required
-                style={inputStyle}
+                style={responsiveInputStyle}
               >
                 {dsTrangThai.map((item, idx) => (
                   <option key={item.id || item.ma_trang_thai || idx} value={item.ma_trang_thai}>
@@ -510,7 +535,7 @@ export default function TiepNhanXePage() {
               placeholder="Ghi chú thêm (nếu có)"
               value={form.ghi_chu}
               onChange={(e) => setForm({ ...form, ghi_chu: e.target.value })}
-              style={inputStyle}
+              style={responsiveInputStyle}
             />
           </div>
 
@@ -530,7 +555,7 @@ export default function TiepNhanXePage() {
               }
               style={{
                 flex: 1,
-                padding: '10px',
+                padding: isSmallMobile ? '11px' : '10px',
                 borderRadius: '6px',
                 border: '1px solid #cbd5e1',
                 background: '#f8fafc',
@@ -543,14 +568,13 @@ export default function TiepNhanXePage() {
               Nhập lại
             </button>
 
-            {/* Chặn nút lưu nếu không có quyền TN_ADD */}
             {canAdd ? (
               <button
                 type="submit"
                 disabled={loading}
                 style={{
                   flex: 1.5,
-                  padding: '10px',
+                  padding: isSmallMobile ? '11px' : '10px',
                   borderRadius: '6px',
                   border: 'none',
                   background: '#0284c7',
@@ -568,7 +592,7 @@ export default function TiepNhanXePage() {
                 disabled
                 style={{
                   flex: 1.5,
-                  padding: '10px',
+                  padding: isSmallMobile ? '11px' : '10px',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   background: '#f1f5f9',
@@ -585,40 +609,191 @@ export default function TiepNhanXePage() {
         </form>
       </div>
 
-      {/* NHẬT KÝ DỊCH VỤ BÊN PHẢI */}
-      <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      {/* NHẬT KÝ DỊCH VỤ */}
+      <div
+        style={{
+          backgroundColor: '#fff',
+          padding: isSmallMobile ? '16px 14px' : '20px',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          minWidth: 0,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '8px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>🕒</span> NHẬT KÝ DỊCH VỤ
           </h3>
-          <span style={{ fontSize: '11px', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+          <span
+            style={{
+              fontSize: '11px',
+              color: '#0284c7',
+              backgroundColor: '#e0f2fe',
+              padding: '3px 9px',
+              borderRadius: '4px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+            }}
+          >
             25 xe gần nhất
           </span>
         </div>
 
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
-                <th style={{ padding: '10px' }}>NO.</th>
-                <th style={{ padding: '10px' }}>THỜI GIAN</th>
-                <th style={{ padding: '10px' }}>BIỂN SỐ</th>
-                <th style={{ padding: '10px' }}>KHÁCH HÀNG</th>
-                <th style={{ padding: '10px' }}>CỐ VẤN VIÊN</th>
-                <th style={{ padding: '10px' }}>HẠNG MỤC</th>
-                <th style={{ padding: '10px', textAlign: 'center' }}>HẸN</th>
-                <th style={{ padding: '10px', textAlign: 'center' }}>THAO TÁC</th>
-              </tr>
-            </thead>
-            <tbody>
-              {nhatKy.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                    Chưa có nhật ký tiếp nhận xe nào.
-                  </td>
+        {nhatKy.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px' }}>
+            Chưa có nhật ký tiếp nhận xe nào.
+          </div>
+        ) : isSmallMobile ? (
+          /* GIAO DIỆN THẺ (CARD) DỌC TRÊN ĐIỆN THOẠI */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {nhatKy.map((row, index) => {
+              const daKhoa = kiemTraBiKhoa(row.thoi_gian);
+              return (
+                <div
+                  key={row.no_id || index}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderLeft: '4px solid #0284c7',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  {/* Hàng 1: NO + Biển số + Nhãn Hẹn & Hạng mục */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                        #{row.no_id || index + 1}
+                      </span>
+                      <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0284c7' }}>
+                        {row.bien_so}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0', color: '#0f172a' }}>
+                        {row.hang_muc_thuc_hien || row.hang_muc || '---'}
+                      </span>
+                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>
+                        {row.trang_thai_hen || '24H'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Hàng 2: Khách hàng + SĐT */}
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', marginBottom: '4px' }}>
+                    👤 {row.ten_khach_hang}
+                    {row.so_dien_thoai ? <span style={{ fontWeight: 'normal', color: '#475569' }}> • {row.so_dien_thoai}</span> : ''}
+                  </div>
+
+                  {/* Hàng 3: Cố vấn viên */}
+                  <div style={{ fontSize: '12px', color: '#334155', marginBottom: '4px' }}>
+                    🧑‍💼 CVDV: <strong>{row.co_van_vien || row.ten_co_van || '---'}</strong>
+                  </div>
+
+                  {/* Hàng 4: Ghi chú (nếu có) */}
+                  {row.ghi_chu && (
+                    <div style={{ fontSize: '12px', color: '#475569', backgroundColor: '#f8fafc', padding: '4px 8px', borderRadius: '4px', marginBottom: '6px' }}>
+                      📝 {row.ghi_chu}
+                    </div>
+                  )}
+
+                  {/* Hàng 5: Thời gian + Thao tác */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderTop: '1px solid #f1f5f9',
+                      paddingTop: '8px',
+                      marginTop: '6px',
+                      gap: '8px',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>
+                      🕒 {row.thoi_gian ? new Date(row.thoi_gian).toLocaleString('vi-VN') : '---'}
+                    </span>
+
+                    {daKhoa ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          border: '1px solid #cbd5e1',
+                          backgroundColor: '#f8fafc',
+                          color: '#64748b',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                        }}
+                      >
+                        🔒 Khóa
+                      </span>
+                    ) : (
+                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(row)}
+                            style={{
+                              padding: '4px 9px',
+                              backgroundColor: '#f0f9ff',
+                              border: '1px solid #bae6fd',
+                              color: '#0284c7',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                            }}
+                          >
+                            ✏️ Sửa
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(row)}
+                            style={{
+                              padding: '4px 9px',
+                              backgroundColor: '#fef2f2',
+                              border: '1px solid #fecaca',
+                              color: '#dc2626',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                            }}
+                          >
+                            🗑 Xóa
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* GIAO DIỆN BẢNG TRÊN MÁY TÍNH / TABLET */
+          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                  <th style={{ padding: '10px' }}>NO.</th>
+                  <th style={{ padding: '10px' }}>THỜI GIAN</th>
+                  <th style={{ padding: '10px' }}>BIỂN SỐ</th>
+                  <th style={{ padding: '10px' }}>KHÁCH HÀNG</th>
+                  <th style={{ padding: '10px' }}>CỐ VẤN VIÊN</th>
+                  <th style={{ padding: '10px' }}>HẠNG MỤC</th>
+                  <th style={{ padding: '10px', textAlign: 'center' }}>HẸN</th>
+                  <th style={{ padding: '10px', textAlign: 'center' }}>THAO TÁC</th>
                 </tr>
-              ) : (
-                nhatKy.map((row, index) => {
+              </thead>
+              <tbody>
+                {nhatKy.map((row, index) => {
                   const daKhoa = kiemTraBiKhoa(row.thoi_gian);
 
                   return (
@@ -627,11 +802,11 @@ export default function TiepNhanXePage() {
                       <td style={{ padding: '10px', color: '#64748b' }}>
                         {row.thoi_gian ? new Date(row.thoi_gian).toLocaleString('vi-VN') : '---'}
                       </td>
-                      <td style={{ padding: '10px', color: '#0284c7', fontWeight: 'bold' }}>{row.bien_so}</td>
+                      <td style={{ padding: '10px', color: '#0284c7', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{row.bien_so}</td>
                       <td style={{ padding: '10px', fontWeight: '500' }}>{row.ten_khach_hang}</td>
                       <td style={{ padding: '10px' }}>{row.co_van_vien || row.ten_co_van || '---'}</td>
                       <td style={{ padding: '10px' }}>
-                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#f1f5f9', fontWeight: 'bold', fontSize: '11px', border: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
                           {row.hang_muc_thuc_hien || row.hang_muc || '---'}
                         </span>
                       </td>
@@ -640,7 +815,7 @@ export default function TiepNhanXePage() {
                           {row.trang_thai_hen || '24H'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                      <td style={{ padding: '10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         {daKhoa ? (
                           <span
                             title="Đã khóa (sau 18h00 hoặc qua ngày)"
@@ -708,11 +883,11 @@ export default function TiepNhanXePage() {
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* MODAL SỬA LƯỢT TIẾP NHẬN */}
@@ -727,7 +902,7 @@ export default function TiepNhanXePage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 99999,
-            padding: '16px',
+            padding: isSmallMobile ? '10px' : '16px',
           }}
         >
           <div
@@ -736,11 +911,14 @@ export default function TiepNhanXePage() {
               borderRadius: '10px',
               width: '100%',
               maxWidth: '440px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
               overflow: 'hidden',
             }}
           >
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>
                 ✏️ Chỉnh Sửa Tiếp Nhận: {editRow.bien_so}
               </h3>
@@ -753,7 +931,7 @@ export default function TiepNhanXePage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSaveEdit} style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
               <div>
                 <label style={labelStyle}>Tên khách hàng</label>
                 <input
@@ -761,7 +939,7 @@ export default function TiepNhanXePage() {
                   value={editRow.ten_khach_hang || ''}
                   onChange={(e) => setEditRow({ ...editRow, ten_khach_hang: e.target.value })}
                   required
-                  style={inputStyle}
+                  style={responsiveInputStyle}
                 />
               </div>
 
@@ -771,7 +949,7 @@ export default function TiepNhanXePage() {
                   type="text"
                   value={editRow.so_dien_thoai || ''}
                   onChange={(e) => setEditRow({ ...editRow, so_dien_thoai: e.target.value })}
-                  style={inputStyle}
+                  style={responsiveInputStyle}
                 />
               </div>
 
@@ -781,7 +959,7 @@ export default function TiepNhanXePage() {
                   value={editRow.co_van_vien || ''}
                   onChange={(e) => setEditRow({ ...editRow, co_van_vien: e.target.value })}
                   required
-                  style={inputStyle}
+                  style={responsiveInputStyle}
                 >
                   {danhSachCoVan.map((cv) => (
                     <option key={cv.ma_nv} value={`${cv.ma_nv} ${cv.ho_ten}`}>
@@ -791,13 +969,13 @@ export default function TiepNhanXePage() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={labelStyle}>Hạng mục</label>
                   <select
                     value={editRow.hang_muc_thuc_hien || ''}
                     onChange={(e) => setEditRow({ ...editRow, hang_muc_thuc_hien: e.target.value })}
-                    style={inputStyle}
+                    style={responsiveInputStyle}
                   >
                     {dsHangMuc.map((item, idx) => (
                       <option key={item.id || idx} value={item.ma_hang_muc}>
@@ -812,7 +990,7 @@ export default function TiepNhanXePage() {
                   <select
                     value={editRow.trang_thai_hen || '24H'}
                     onChange={(e) => setEditRow({ ...editRow, trang_thai_hen: e.target.value })}
-                    style={inputStyle}
+                    style={responsiveInputStyle}
                   >
                     {dsTrangThai.map((item, idx) => (
                       <option key={item.id || idx} value={item.ma_trang_thai}>
@@ -829,7 +1007,7 @@ export default function TiepNhanXePage() {
                   type="text"
                   value={editRow.ghi_chu || ''}
                   onChange={(e) => setEditRow({ ...editRow, ghi_chu: e.target.value })}
-                  style={inputStyle}
+                  style={responsiveInputStyle}
                 />
               </div>
 
@@ -838,14 +1016,14 @@ export default function TiepNhanXePage() {
                   type="button"
                   onClick={() => setModalEditOpen(false)}
                   disabled={savingEdit}
-                  style={{ padding: '7px 14px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer' }}
+                  style={{ padding: '9px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontWeight: '600' }}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  style={{ padding: '7px 18px', borderRadius: '4px', border: 'none', background: '#0284c7', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                  style={{ padding: '9px 18px', borderRadius: '6px', border: 'none', background: '#0284c7', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                   {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>

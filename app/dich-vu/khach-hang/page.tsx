@@ -25,6 +25,18 @@ const FORM_MAC_DINH: KhachHangItem = {
 
 export default function KhachHangHenPage() {
   const { currentUser, kiemTraQuyen } = useAuth();
+  const [screenWidth, setScreenWidth] = useState(1200);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isSmallMobile = screenWidth < 640;
+  const isMobile = screenWidth < 768;
+
   const [danhSach, setDanhSach] = useState<KhachHangItem[]>([]);
   const [tongSoKhach, setTongSoKhach] = useState(0);
   const [danhSachCoVan, setDanhSachCoVan] = useState<any[]>([]);
@@ -76,7 +88,6 @@ export default function KhachHangHenPage() {
   async function loadKhachHang(searchKeyword = tuKhoa) {
     setLoading(true);
     try {
-      // Đếm tổng số khách thực tế trong toàn bộ database (không kéo dữ liệu nặng)
       const { count } = await supabase
         .from('dich_vu_khach_hang')
         .select('*', { count: 'exact', head: true });
@@ -86,12 +97,12 @@ export default function KhachHangHenPage() {
 
       const k = searchKeyword.trim();
       if (k) {
-        // Tìm kiếm toàn diện trên 1.582+ bản ghi
-        query = query.or(
-          `bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%`
-        ).limit(100);
+        query = query
+          .or(
+            `bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%`
+          )
+          .limit(100);
       } else {
-        // Khi không tìm kiếm, chỉ lấy 50 khách hàng gần nhất
         query = query.order('id', { ascending: false }).limit(50);
       }
 
@@ -202,84 +213,267 @@ export default function KhachHangHenPage() {
     }
   }
 
+  const responsiveInputStyle = {
+    ...inputStyle,
+    fontSize: isSmallMobile ? '15px' : '13px',
+    padding: isSmallMobile ? '10px 11px' : '8px 10px',
+  };
+
   return (
-    <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'Segoe UI, sans-serif' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-        
+    <div
+      style={{
+        padding: isMobile ? '14px 12px 24px 12px' : '24px',
+        backgroundColor: '#f8fafc',
+        minHeight: '100vh',
+        fontFamily: 'Segoe UI, sans-serif',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          padding: isMobile ? '16px 14px' : '20px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}
+      >
         {/* HEADER TOOLBAR */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>📅</span>
-            <h1 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
-              DANH SÁCH KHÁCH HÀNG HẸN
-            </h1>
-            <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '12px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'stretch' : 'center',
+            marginBottom: '18px',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>📅</span>
+              <h1 style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
+                DANH SÁCH KHÁCH HÀNG HẸN
+              </h1>
+            </div>
+            <span
+              style={{
+                backgroundColor: '#e0f2fe',
+                color: '#0369a1',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                padding: '3px 9px',
+                borderRadius: '12px',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {tuKhoa ? `Tìm thấy ${danhSach.length} khách` : `Tổng: ${tongSoKhach || danhSach.length} khách`}
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '8px',
+              alignItems: isMobile ? 'stretch' : 'center',
+            }}
+          >
             <input
               type="text"
               placeholder="🔍 Tìm biển số, tên, SĐT, cố vấn..."
               value={tuKhoa}
               onChange={(e) => setTuKhoa(e.target.value)}
               style={{
-                padding: '7px 12px',
+                padding: isMobile ? '10px 12px' : '7px 12px',
                 border: '1px solid #cbd5e1',
                 borderRadius: '6px',
-                fontSize: '12px',
+                fontSize: isMobile ? '15px' : '12px',
                 outline: 'none',
-                width: '260px',
+                width: isMobile ? '100%' : '260px',
+                boxSizing: 'border-box',
               }}
             />
 
-            {canAdd && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {canAdd && (
+                <button
+                  type="button"
+                  onClick={handleOpenAdd}
+                  style={{
+                    flex: isMobile ? 1 : 'none',
+                    backgroundColor: '#0284c7',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: isMobile ? '10px 14px' : '7px 16px',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span>➕</span> Thêm hẹn mới
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={handleOpenAdd}
+                onClick={() => loadKhachHang()}
+                title="Làm mới bảng"
                 style={{
-                  backgroundColor: '#0284c7',
-                  color: '#fff',
-                  border: 'none',
+                  backgroundColor: '#fff',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
                   borderRadius: '6px',
-                  padding: '7px 16px',
+                  padding: isMobile ? '10px 14px' : '7px 12px',
                   fontSize: '13px',
-                  fontWeight: 'bold',
+                  fontWeight: '600',
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
+                  flexShrink: 0,
                 }}
               >
-                <span>➕</span> Thêm hẹn mới
+                🔄
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => loadKhachHang()}
-              title="Làm mới bảng"
-              style={{
-                backgroundColor: '#fff',
-                border: '1px solid #cbd5e1',
-                color: '#475569',
-                borderRadius: '6px',
-                padding: '7px 12px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              🔄
-            </button>
+            </div>
           </div>
         </div>
 
-        {/* BẢNG DỮ LIỆU */}
+        {/* HIỂN THỊ DỮ LIỆU */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Đang tìm kiếm...</div>
+          <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>Đang tìm kiếm...</div>
+        ) : danhSach.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px' }}>
+            Không tìm thấy khách hàng nào khớp với từ khóa "{tuKhoa}".
+          </div>
+        ) : isMobile ? (
+          /* GIAO DIỆN THẺ (CARD) DỌC TRÊN ĐIỆN THOẠI */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {danhSach.map((kh) => (
+              <div
+                key={kh.bien_so}
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderLeft: '4px solid #0284c7',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  backgroundColor: '#fff',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                }}
+              >
+                {/* Hàng 1: Biển số + Hạng mục & Trạng thái */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0284c7' }}>
+                    {kh.bien_so}
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                    {kh.hang_muc_du_kien && (
+                      <span
+                        style={{
+                          backgroundColor: '#f0f9ff',
+                          color: '#0369a1',
+                          border: '1px solid #bae6fd',
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        {kh.hang_muc_du_kien}
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        backgroundColor: '#f1f5f9',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {kh.trang_thai_hen || '24H'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Hàng 2: Tên khách hàng + Số điện thoại */}
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a', marginBottom: '4px' }}>
+                  👤 {kh.ten_khach_hang}
+                  {kh.so_dien_thoai && (
+                    <span style={{ fontWeight: 'normal', color: '#475569', fontSize: '13px' }}>
+                      {' '}• 📞 {kh.so_dien_thoai}
+                    </span>
+                  )}
+                </div>
+
+                {/* Hàng 3: Cố vấn viên + Nút Sửa/Xóa */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderTop: '1px solid #f1f5f9',
+                    paddingTop: '8px',
+                    marginTop: '6px',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: '#475569' }}>
+                    🧑‍💼 CVDV: <strong>{kh.co_van || 'Chưa chỉ định'}</strong>
+                  </div>
+
+                  <div style={{ display: 'inline-flex', gap: '6px', flexShrink: 0 }}>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(kh)}
+                        style={{
+                          padding: '5px 10px',
+                          backgroundColor: '#f0f9ff',
+                          border: '1px solid #bae6fd',
+                          color: '#0284c7',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                        }}
+                      >
+                        ✏️ Sửa
+                      </button>
+                    )}
+
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(kh)}
+                        style={{
+                          padding: '5px 10px',
+                          backgroundColor: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          color: '#dc2626',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                        }}
+                      >
+                        🗑 Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
+          /* BẢNG DỮ LIỆU ĐẦY ĐỦ TRÊN MÁY TÍNH */
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
@@ -294,89 +488,81 @@ export default function KhachHangHenPage() {
                 </tr>
               </thead>
               <tbody>
-                {danhSach.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                      Không tìm thấy khách hàng nào khớp với từ khóa "{tuKhoa}".
+                {danhSach.map((kh) => (
+                  <tr key={kh.bien_so} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#0284c7', whiteSpace: 'nowrap' }}>
+                      {kh.bien_so}
+                    </td>
+                    <td style={{ padding: '12px 14px', fontWeight: '600', color: '#0f172a' }}>
+                      {kh.ten_khach_hang}
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#334155' }}>
+                      {kh.hang_muc_du_kien || '---'}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <span
+                        style={{
+                          backgroundColor: '#f1f5f9',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        {kh.trang_thai_hen || '24H'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#475569' }}>
+                      {kh.so_dien_thoai || '---'}
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#334155', fontWeight: '500' }}>
+                      {kh.co_van || '---'}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(kh)}
+                            title="Sửa thông tin"
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#fff',
+                              border: '1px solid #bae6fd',
+                              color: '#0284c7',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                            }}
+                          >
+                            ✏️
+                          </button>
+                        )}
+
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(kh)}
+                            title="Xóa khách hẹn"
+                            style={{
+                              padding: '4px 8px',
+                              backgroundColor: '#fff',
+                              border: '1px solid #fecaca',
+                              color: '#dc2626',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                            }}
+                          >
+                            🗑
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ) : (
-                  danhSach.map((kh) => (
-                    <tr key={kh.bien_so} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#0284c7' }}>
-                        {kh.bien_so}
-                      </td>
-                      <td style={{ padding: '12px 14px', fontWeight: '600', color: '#0f172a' }}>
-                        {kh.ten_khach_hang}
-                      </td>
-                      <td style={{ padding: '12px 14px', color: '#334155' }}>
-                        {kh.hang_muc_du_kien || '---'}
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <span
-                          style={{
-                            backgroundColor: '#f1f5f9',
-                            color: '#334155',
-                            border: '1px solid #cbd5e1',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {kh.trang_thai_hen || '24H'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 14px', color: '#475569' }}>
-                        {kh.so_dien_thoai || '---'}
-                      </td>
-                      <td style={{ padding: '12px 14px', color: '#334155', fontWeight: '500' }}>
-                        {kh.co_van || '---'}
-                      </td>
-                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          {canEdit && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(kh)}
-                              title="Sửa thông tin"
-                              style={{
-                                padding: '4px 8px',
-                                backgroundColor: '#fff',
-                                border: '1px solid #bae6fd',
-                                color: '#0284c7',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                              }}
-                            >
-                              ✏️
-                            </button>
-                          )}
-
-                          {canDelete && (
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(kh)}
-                              title="Xóa khách hẹn"
-                              style={{
-                                padding: '4px 8px',
-                                backgroundColor: '#fff',
-                                border: '1px solid #fecaca',
-                                color: '#dc2626',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                              }}
-                            >
-                              🗑
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -395,7 +581,7 @@ export default function KhachHangHenPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 99999,
-            padding: '16px',
+            padding: isSmallMobile ? '10px' : '16px',
           }}
         >
           <div
@@ -404,17 +590,21 @@ export default function KhachHangHenPage() {
               borderRadius: '12px',
               width: '100%',
               maxWidth: '460px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
               overflow: 'hidden',
             }}
           >
             <div
               style={{
-                padding: '16px 20px',
+                padding: '14px 18px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexShrink: 0,
               }}
             >
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -430,7 +620,7 @@ export default function KhachHangHenPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSave} style={{ padding: '20px' }}>
+            <form onSubmit={handleSave} style={{ padding: '18px', overflowY: 'auto' }}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>
                   Biển số xe <span style={{ color: '#ef4444' }}>*</span>
@@ -445,7 +635,7 @@ export default function KhachHangHenPage() {
                     disabled={isEditing}
                     required
                     style={{
-                      ...inputStyle,
+                      ...responsiveInputStyle,
                       textTransform: 'uppercase',
                       fontWeight: 'bold',
                       backgroundColor: isEditing ? '#f1f5f9' : '#fff',
@@ -462,7 +652,7 @@ export default function KhachHangHenPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1.2fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Tên khách hàng <span style={{ color: '#ef4444' }}>*</span></label>
                   <input
@@ -471,7 +661,7 @@ export default function KhachHangHenPage() {
                     value={formData.ten_khach_hang}
                     onChange={(e) => setFormData({ ...formData, ten_khach_hang: e.target.value })}
                     required
-                    style={inputStyle}
+                    style={responsiveInputStyle}
                   />
                 </div>
 
@@ -482,18 +672,18 @@ export default function KhachHangHenPage() {
                     placeholder="VD: 0983xxxxxx"
                     value={formData.so_dien_thoai}
                     onChange={(e) => setFormData({ ...formData, so_dien_thoai: e.target.value })}
-                    style={inputStyle}
+                    style={responsiveInputStyle}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Hạng mục dự kiến</label>
                   <select
                     value={formData.hang_muc_du_kien}
                     onChange={(e) => setFormData({ ...formData, hang_muc_du_kien: e.target.value })}
-                    style={inputStyle}
+                    style={responsiveInputStyle}
                   >
                     {dsHangMuc.map((item, index) => (
                       <option key={item.id || item.ma_hang_muc || index} value={item.ma_hang_muc}>
@@ -508,7 +698,7 @@ export default function KhachHangHenPage() {
                   <select
                     value={formData.trang_thai_hen}
                     onChange={(e) => setFormData({ ...formData, trang_thai_hen: e.target.value })}
-                    style={inputStyle}
+                    style={responsiveInputStyle}
                   >
                     {dsTrangThai.map((item, index) => (
                       <option key={item.id || item.ma_trang_thai || index} value={item.ma_trang_thai}>
@@ -519,12 +709,12 @@ export default function KhachHangHenPage() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '18px' }}>
                 <label style={labelStyle}>Cố vấn viên phụ trách (CVDV)</label>
                 <select
                   value={formData.co_van}
                   onChange={(e) => setFormData({ ...formData, co_van: e.target.value })}
-                  style={inputStyle}
+                  style={responsiveInputStyle}
                 >
                   <option value="">-- Chưa chỉ định --</option>
                   {danhSachCoVan.map((nv) => (
@@ -541,7 +731,7 @@ export default function KhachHangHenPage() {
                   onClick={() => setModalOpen(false)}
                   disabled={saving}
                   style={{
-                    padding: '8px 16px',
+                    padding: '9px 16px',
                     backgroundColor: '#f1f5f9',
                     border: '1px solid #cbd5e1',
                     borderRadius: '6px',
@@ -557,7 +747,7 @@ export default function KhachHangHenPage() {
                   type="submit"
                   disabled={saving}
                   style={{
-                    padding: '8px 20px',
+                    padding: '9px 20px',
                     backgroundColor: '#0284c7',
                     color: '#fff',
                     border: 'none',
