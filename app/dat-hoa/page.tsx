@@ -83,7 +83,7 @@ export default function QuanLyDatHoaPage() {
         });
 
         // Nếu không tìm thấy chữ "tư vấn bán hàng", lấy tất cả nhân viên bộ phận Kinh doanh
-        const dsCuoiCung =
+        /*const dsCuoiCung =
           tvbhList.length > 0
             ? tvbhList
             : nvHoatDong.filter((nv) => {
@@ -92,7 +92,7 @@ export default function QuanLyDatHoaPage() {
                   .join(' ')
                   .toLowerCase();
                 return allText.includes('kinh doanh');
-              });
+              });*/
 
         setDanhSachTVBH(dsCuoiCung.length > 0 ? dsCuoiCung : nvHoatDong);
 
