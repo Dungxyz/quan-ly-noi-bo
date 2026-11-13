@@ -216,6 +216,8 @@ export default function QuanLyDatHoaPage() {
 
     return false;
   }
+  // Chỉ ADMIN hoặc HCNS (Nhân viên HCNS, Nhân viên IT, Phó phòng HCNS) mới được chọn TVBH khác
+  const coQuyenChonTVBH = getVaiTroUser(currentUser).isToanQuyen;
 
   // Mở form tạo đơn đặt hoa
   function handleOpenForm() {
@@ -224,10 +226,11 @@ export default function QuanLyDatHoaPage() {
     setImageFile(null);
     setImagePreview('');
 
-    const isCurrentUserTVBH = danhSachTVBH.some((tv) => tv.ma_nv === currentUser?.ma_nv);
+    // Nếu không có quyền chọn TVBH khác -> khóa cứng theo chính tài khoản đang đăng nhập
+    const maMacDinh = coQuyenChonTVBH ? '' : String(currentUser?.ma_nv || '').trim();
 
     setForm({
-      ma_nv_tvbh: isCurrentUserTVBH ? currentUser.ma_nv : '',
+      ma_nv_tvbh: maMacDinh,
       ten_khach_hang: '',
       hop_dong_so: '',
       so_vin_bien_so: '',
@@ -710,19 +713,52 @@ export default function QuanLyDatHoaPage() {
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
                   Tư vấn bán hàng <span style={{ color: '#ef4444' }}>*</span>
                 </label>
-                <select
-                  required
-                  value={form.ma_nv_tvbh}
-                  onChange={(e) => setForm({ ...form, ma_nv_tvbh: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff', boxSizing: 'border-box' }}
-                >
-                  <option value="">-- Chọn Tư vấn bán hàng --</option>
-                  {danhSachTVBH.map((tv) => (
-                    <option key={tv.ma_nv} value={tv.ma_nv}>
-                      {tv.ma_nv} {tv.ho_ten}
-                    </option>
-                  ))}
-                </select>
+
+                {coQuyenChonTVBH ? (
+                  <select
+                    required
+                    value={form.ma_nv_tvbh}
+                    onChange={(e) => setForm({ ...form, ma_nv_tvbh: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px',
+                      backgroundColor: '#fff',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="">-- Chọn Tư vấn bán hàng --</option>
+                    {danhSachTVBH.map((tv) => (
+                      <option key={tv.ma_nv} value={tv.ma_nv}>
+                        {tv.ma_nv} {tv.ho_ten}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    readOnly
+                    value={
+                      currentUser
+                        ? `${currentUser.ma_nv} ${currentUser.ho_ten}`
+                        : 'Chưa xác định tài khoản'
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#f1f5f9',
+                      color: '#334155',
+                      fontWeight: '600',
+                      fontSize: '13px',
+                      cursor: 'not-allowed',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                )}
               </div>
 
               {/* Tên khách hàng */}

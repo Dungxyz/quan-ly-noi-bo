@@ -145,7 +145,7 @@ export async function POST(req: Request) {
 ⏰ Ngày/giờ giao xe: <b>${ngay_gio_giao_xe}</b>
 📝 Ghi chú: ${ghi_chu || 'Không có'}${canhBaoTre}${dongAnh}
 ⏳ Trạng thái: <b>CHỜ PHÓ GĐKD DUYỆT</b>`;
-      } else if (hanh_dong === 'DUYET_DON') {
+      } else if (hanh_dong === 'DA_DUYET' || hanh_dong === 'DUYET_DON') {
         noiDungHoa = `✅ <b>[ĐÃ DUYỆT ĐƠN ĐẶT HOA GIAO XE]</b>
 ━━━━━━━━━━━━━━━━━━━━
 👤 Khách hàng: <b>${ten_khach_hang}</b> (HĐ: ${hop_dong_so})
