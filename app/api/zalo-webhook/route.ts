@@ -1,42 +1,50 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Dùng Service Role Key nếu có để ghi thẳng vào bảng nhan_vien mà không bị chặn RLS
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Ánh xạ 6 Bot với URL gửi tin và tên cột trong bảng nhan_vien
-const CAU_HINH_6_BOT: Record<string, { tenBot: string; url: string; cotDb: string }> = {
+// Ánh xạ 6 Bot với URL, Secret Token và tên cột trong bảng nhan_vien
+const CAU_HINH_6_BOT: Record<
+  string,
+  { tenBot: string; url: string; secretToken: string; cotDb: string }
+> = {
   '1': {
-    tenBot: 'Bot 1 (/ Tài khoản / Đặt hoa)',
+    tenBot: 'Bot 1 (HCNS / Tài khoản)',
     url: process.env.ZALO_BOT_1_URL || '',
+    secretToken: process.env.ZALO_BOT_1_SECRET || '',
     cotDb: 'id_doan_chat_bot',
   },
   '2': {
     tenBot: 'Bot 2 (Dịch vụ / Tiếp nhận xe)',
     url: process.env.ZALO_BOT_2_URL || '',
+    secretToken: process.env.ZALO_BOT_2_SECRET || '',
     cotDb: 'id_doan_chat_bot_2',
   },
   '3': {
-    tenBot: 'Bot 3 (Dự phòng 0)',
+    tenBot: 'Bot 3 (Kinh doanh / Đặt hoa)',
     url: process.env.ZALO_BOT_3_URL || '',
+    secretToken: process.env.ZALO_BOT_3_SECRET || '',
     cotDb: 'id_doan_chat_bot_3',
   },
   '4': {
     tenBot: 'Bot 4 (Dự phòng 1)',
     url: process.env.ZALO_BOT_4_URL || '',
+    secretToken: process.env.ZALO_BOT_4_SECRET || '',
     cotDb: 'id_doan_chat_bot_4',
   },
   '5': {
     tenBot: 'Bot 5 (Dự phòng 2)',
     url: process.env.ZALO_BOT_5_URL || '',
+    secretToken: process.env.ZALO_BOT_5_SECRET || '',
     cotDb: 'id_doan_chat_bot_5',
   },
   '6': {
     tenBot: 'Bot 6 (Dự phòng 3)',
     url: process.env.ZALO_BOT_6_URL || '',
+    secretToken: process.env.ZALO_BOT_6_SECRET || '',
     cotDb: 'id_doan_chat_bot_6',
   },
 };
@@ -54,7 +62,6 @@ async function guiTinNhanZalo(botUrl: string, chatId: string, text: string) {
   }).catch((err) => console.error('Lỗi phản hồi Webhook Zalo:', err));
 }
 
-// Endpoint GET để kiểm tra nhanh trên trình duyệt xem Webhook đã sống chưa
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const botSo = searchParams.get('bot') || '1';
@@ -64,16 +71,25 @@ export async function GET(req: Request) {
   });
 }
 
-// Endpoint POST nhận sự kiện tin nhắn từ Zalo Bot Platform
 export async function POST(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const botSo = searchParams.get('bot') || '1';
     const botConfig = CAU_HINH_6_BOT[botSo] || CAU_HINH_6_BOT['1'];
 
+    // Xác thực X-Bot-Api-Secret-Token từ Zalo Bot Platform
+    if (botConfig.secretToken) {
+      const incomingSecret = req.headers.get('x-bot-api-secret-token') || '';
+      if (incomingSecret !== botConfig.secretToken) {
+        return NextResponse.json(
+          { ok: false, error: 'Unauthorized: Invalid secret token' },
+          { status: 401 }
+        );
+      }
+    }
+
     const payload = await req.json().catch(() => ({}));
 
-    // Bắt linh hoạt cấu trúc payload của Zalo Bot Platform
     const msgObj = payload?.message || payload?.result?.message || payload;
     const chatId = String(
       msgObj?.chat?.id ||
@@ -92,7 +108,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, ignored: 'Không tìm thấy chat_id trong payload' });
     }
 
-    // Kiểm tra xem người dùng có nhắn mã nhân viên không (VD: FNV-115 hoặc 115)
+    // Nhận diện mã nhân viên (VD: FNV-115 hoặc 115)
     const cleanText = textNhan.toUpperCase().replace(/\s+/g, '');
     const matchMaNV = cleanText.match(/^(FNV-)?(\d{1,5})$/);
 
@@ -100,7 +116,6 @@ export async function POST(req: Request) {
       const soMa = matchMaNV[2];
       const maChuan = `FNV-${soMa}`;
 
-      // Tìm nhân viên trong Supabase (khớp FNV-115 hoặc mã thuần)
       const { data: dsNV } = await supabaseAdmin
         .from('nhan_vien')
         .select('ma_nv, ho_ten, bo_phan')
@@ -110,7 +125,6 @@ export async function POST(req: Request) {
       const nvTimThay = dsNV && dsNV.length > 0 ? dsNV[0] : null;
 
       if (nvTimThay) {
-        // Tự động lưu chat_id vào đúng cột của Bot hiện tại
         const { error: updateErr } = await supabaseAdmin
           .from('nhan_vien')
           .update({ [botConfig.cotDb]: chatId })
@@ -139,7 +153,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Nếu nhân viên nhắn chữ bất kỳ (VD: "ID", "Hi"...) -> Trả về ngay Chat ID + hướng dẫn liên kết
+    // Phản hồi Chat ID + hướng dẫn nếu nhân viên nhắn nội dung khác
     await guiTinNhanZalo(
       botConfig.url,
       chatId,
