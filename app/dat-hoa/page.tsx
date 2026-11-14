@@ -366,11 +366,7 @@ export default function QuanLyDatHoaPage() {
         }),
       });
 
-      alert(
-        `✅ Đã gửi yêu cầu đặt hoa cho khách ${form.ten_khach_hang}!\nChuyển duyệt tới: ${phongKD}${
-          pgdPhuTrach ? ` (${pgdPhuTrach.ho_ten})` : ''
-        } & bộ phận HCNS/IT`
-      );
+      alert('✅ Đã gửi yêu cầu đặt hoa!');
       setModalOpen(false);
       loadData();
     } catch (err: any) {
