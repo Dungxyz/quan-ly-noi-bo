@@ -47,7 +47,6 @@ export default function Sidebar({ isMobile = false, mobileOpen = false, onCloseM
       path: '/dat-hoa',
       moduleKey: 'DAT_HOA',
       moTa: 'Hoa bàn giao xe & duyệt chi',
-      isPublic: true,
     },
   ];
 
@@ -78,12 +77,36 @@ export default function Sidebar({ isMobile = false, mobileOpen = false, onCloseM
     dangXuat();
   }
 
+  function norm(val) {
+    return String(val || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function coQuyenDatHoaTheoChucDanh(user) {
+    if (!user) return false;
+    const bp = norm(user.bo_phan);
+    const vt = norm(user.vi_tri || user.chuc_vu || user.chuc_danh);
+
+    const isHCNSQuyen =
+      bp === 'hcns' &&
+      (vt.includes('nhân viên hcns') || vt.includes('nhân viên it') || vt.includes('phó phòng hcns'));
+
+    const isPGDKD =
+      bp === 'kinh doanh' &&
+      vt.includes('phó giám đốc kinh doanh');
+
+    const isTVBH =
+      vt.includes('tư vấn bán hàng') || vt === 'tvbh';
+
+    return isHCNSQuyen || isPGDKD || isTVBH;
+  }
+
   function checkQuyen(key, isPublic) {
     if (!currentUser) return false;
-    const role = currentUser.phan_quyen || '';
+    const role = String(currentUser.phan_quyen || '').toUpperCase().trim();
     if (role === 'LOCKED') return false;
     if (isPublic) return true;
     if (role === 'ADMIN' || role === 'ALL') return true;
+    if (key === 'DAT_HOA' && coQuyenDatHoaTheoChucDanh(currentUser)) return true;
     if (role.includes(key)) return true;
     if (typeof kiemTraQuyen === 'function' && kiemTraQuyen(key)) return true;
     return false;
