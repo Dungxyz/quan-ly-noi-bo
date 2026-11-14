@@ -77,7 +77,7 @@ export async function POST(req: Request) {
 
       const noiDungMatKhau = `🔑 <b>[BÌNH PHƯỚC FORD - CẤP / ĐỔI MẬT KHẨU]</b>
 ━━━━━━━━━━━━━━━━━━━━
-👤 Nhân sự: <b>${ho_ten}</b> (${ma_nv})
+👤 Tên đăng nhập: <b>${ma_nv}</b>
 🔐 Mật khẩu mới: <b>${mat_khau_moi}</b>
 🌐 Đường dẫn: https://noibo.binhphuocford.com.vn
 ⏰ Thời gian: ${thoiGianStr}
