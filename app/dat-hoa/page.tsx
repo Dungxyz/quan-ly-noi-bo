@@ -190,7 +190,16 @@ export default function QuanLyDatHoaPage() {
   // PHÂN QUYỀN XEM, TẠO & DUYỆT ĐƠN ĐẶT HOA
   // =========================================================================
   function getVaiTroUser(user: any) {
-    if (!user) return { isToanQuyen: false, isPGDKD: false, phongPGD: '', maNV: '' };
+    if (!user) {
+      return {
+        isToanQuyen: false,
+        isPGDKD: false,
+        isTVBH: false,
+        coQuyenTruyCap: false,
+        phongPGD: '',
+        maNV: '',
+      };
+    }
 
     const role = String(user.phan_quyen || '').toUpperCase().trim();
     const bp = norm(layBoPhanCuaNV(user));
@@ -207,17 +216,26 @@ export default function QuanLyDatHoaPage() {
       bp === 'kinh doanh' &&
       (vt === 'phó giám đốc kinh doanh' || vt.includes('phó giám đốc kinh doanh'));
 
+    const isTVBH =
+      vt.includes('tư vấn bán hàng') || vt === 'tvbh';
+
+    const isToanQuyen = isAdmin || isHCNSQuyen;
+    const coQuyenTruyCap = isToanQuyen || isPGDKD || isTVBH;
+
     return {
-      isToanQuyen: isAdmin || isHCNSQuyen,
+      isToanQuyen,
       isPGDKD,
+      isTVBH,
+      coQuyenTruyCap,
       phongPGD: phong,
       maNV,
     };
   }
 
-  const { isToanQuyen, isPGDKD, phongPGD, maNV } = getVaiTroUser(currentUser);
+  const { isToanQuyen, isPGDKD, isTVBH, coQuyenTruyCap, phongPGD, maNV } = getVaiTroUser(currentUser);
   const coQuyenChonTVBH = isToanQuyen;
-  const coQuyenTaoPhieu = isToanQuyen || !isPGDKD;
+  // Chỉ Admin/HCNS/IT hoặc Tư vấn bán hàng mới được tạo phiếu (Bảo vệ, Dịch vụ... không có quyền)
+  const coQuyenTaoPhieu = isToanQuyen || isTVBH;
 
   function coQuyenXemDon(don: any): boolean {
     if (!currentUser) return false;
