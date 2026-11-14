@@ -79,6 +79,7 @@ export async function POST(req: Request) {
 ━━━━━━━━━━━━━━━━━━━━
 👤 Nhân sự: <b>${ho_ten}</b> (${ma_nv})
 🔐 Mật khẩu mới: <b>${mat_khau_moi}</b>
+🌐 Đường dẫn: https://noibo.binhphuocford.com.vn
 ⏰ Thời gian: ${thoiGianStr}
 ⚠️ Vui lòng đăng nhập và bảo mật thông tin tài khoản.`;
 
