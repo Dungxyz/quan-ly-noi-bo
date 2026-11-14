@@ -6,44 +6,49 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Ánh xạ 6 Bot với URL, Secret Token và tên cột trong bảng nhan_vien
 const CAU_HINH_6_BOT: Record<
   string,
-  { tenBot: string; url: string; secretToken: string; cotDb: string }
+  { tenBot: string; url: string; groupId: string; secretToken: string; cotDb: string }
 > = {
   '1': {
     tenBot: 'Bot 1 (HCNS / Tài khoản)',
     url: process.env.ZALO_BOT_1_URL || '',
+    groupId: process.env.ZALO_GROUP_1_ID || '',
     secretToken: process.env.ZALO_BOT_1_SECRET || '',
     cotDb: 'id_doan_chat_bot',
   },
   '2': {
     tenBot: 'Bot 2 (Dịch vụ / Tiếp nhận xe)',
     url: process.env.ZALO_BOT_2_URL || '',
+    groupId: process.env.ZALO_GROUP_2_ID || '',
     secretToken: process.env.ZALO_BOT_2_SECRET || '',
     cotDb: 'id_doan_chat_bot_2',
   },
   '3': {
     tenBot: 'Bot 3 (Kinh doanh / Đặt hoa)',
     url: process.env.ZALO_BOT_3_URL || '',
+    groupId: process.env.ZALO_GROUP_3_ID || '',
     secretToken: process.env.ZALO_BOT_3_SECRET || '',
     cotDb: 'id_doan_chat_bot_3',
   },
   '4': {
     tenBot: 'Bot 4 (Dự phòng 1)',
     url: process.env.ZALO_BOT_4_URL || '',
+    groupId: process.env.ZALO_GROUP_4_ID || '',
     secretToken: process.env.ZALO_BOT_4_SECRET || '',
     cotDb: 'id_doan_chat_bot_4',
   },
   '5': {
     tenBot: 'Bot 5 (Dự phòng 2)',
     url: process.env.ZALO_BOT_5_URL || '',
+    groupId: process.env.ZALO_GROUP_5_ID || '',
     secretToken: process.env.ZALO_BOT_5_SECRET || '',
     cotDb: 'id_doan_chat_bot_5',
   },
   '6': {
     tenBot: 'Bot 6 (Dự phòng 3)',
     url: process.env.ZALO_BOT_6_URL || '',
+    groupId: process.env.ZALO_GROUP_6_ID || '',
     secretToken: process.env.ZALO_BOT_6_SECRET || '',
     cotDb: 'id_doan_chat_bot_6',
   },
@@ -67,6 +72,7 @@ export async function GET(req: Request) {
   const botSo = searchParams.get('bot') || '1';
   return NextResponse.json({
     ok: true,
+    hasServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     message: `Zalo Webhook Bình Phước Ford đang hoạt động (Bot ${botSo})`,
   });
 }
@@ -77,7 +83,6 @@ export async function POST(req: Request) {
     const botSo = searchParams.get('bot') || '1';
     const botConfig = CAU_HINH_6_BOT[botSo] || CAU_HINH_6_BOT['1'];
 
-    // Xác thực X-Bot-Api-Secret-Token từ Zalo Bot Platform
     if (botConfig.secretToken) {
       const incomingSecret = req.headers.get('x-bot-api-secret-token') || '';
       if (incomingSecret !== botConfig.secretToken) {
@@ -89,8 +94,8 @@ export async function POST(req: Request) {
     }
 
     const payload = await req.json().catch(() => ({}));
-
     const msgObj = payload?.message || payload?.result?.message || payload;
+
     const chatId = String(
       msgObj?.chat?.id ||
       msgObj?.from?.id ||
@@ -98,31 +103,57 @@ export async function POST(req: Request) {
       ''
     ).trim();
 
-    const textNhan = String(
-      msgObj?.text ||
-      payload?.message?.text ||
-      ''
-    ).trim();
+    const chatType = String(msgObj?.chat?.type || '').toLowerCase();
+    const textNhan = String(msgObj?.text || payload?.message?.text || '').trim();
 
     if (!chatId) {
-      return NextResponse.json({ ok: true, ignored: 'Không tìm thấy chat_id trong payload' });
+      return NextResponse.json({ ok: true, ignored: 'Không tìm thấy chat_id' });
     }
 
-    // Nhận diện mã nhân viên (VD: FNV-115 hoặc 115)
+    // Nếu nhắn từ nhóm chat -> chỉ trả mã Group ID, không ghi đè vào hồ sơ cá nhân
+    const isGroupChat =
+      chatType === 'group' ||
+      (botConfig.groupId && chatId === botConfig.groupId.trim());
+
+    if (isGroupChat) {
+      await guiTinNhanZalo(
+        botConfig.url,
+        chatId,
+        `📢 <b>[ID NHÓM CHAT - ${botConfig.tenBot.toUpperCase()}]</b>
+━━━━━━━━━━━━━━━━━━━━
+🆔 Group Chat ID: <code>${chatId}</code>
+<i>(Để liên kết hồ sơ cá nhân, vui lòng nhắn trực tiếp riêng cho Bot thay vì nhắn trong nhóm)</i>`
+      );
+      return NextResponse.json({ ok: true, groupChatId: chatId });
+    }
+
+    // Nhận diện mã nhân viên (VD: FNV-113, fnv 113, 113)
     const cleanText = textNhan.toUpperCase().replace(/\s+/g, '');
-    const matchMaNV = cleanText.match(/^(FNV-)?(\d{1,5})$/);
+    const matchMaNV = cleanText.match(/^(FNV-?)?(\d{1,5})$/);
 
     if (matchMaNV) {
       const soMa = matchMaNV[2];
       const maChuan = `FNV-${soMa}`;
 
-      const { data: dsNV } = await supabaseAdmin
+      const { data: dsNV, error: queryErr } = await supabaseAdmin
         .from('nhan_vien')
         .select('ma_nv, ho_ten, bo_phan')
-        .or(`ma_nv.ilike.${maChuan},ma_nv.ilike.${soMa}`)
-        .limit(1);
+        .ilike('ma_nv', `%${soMa}%`);
 
-      const nvTimThay = dsNV && dsNV.length > 0 ? dsNV[0] : null;
+      if (queryErr) {
+        await guiTinNhanZalo(
+          botConfig.url,
+          chatId,
+          `⚠️ Lỗi truy vấn dữ liệu: ${queryErr.message}\n🆔 Chat ID của bạn: <code>${chatId}</code>`
+        );
+        return NextResponse.json({ ok: false, error: queryErr.message });
+      }
+
+      // Khớp chính xác phần số của mã nhân viên (tránh FNV-11 khớp nhầm FNV-113)
+      const nvTimThay = (dsNV || []).find((nv) => {
+        const maDb = String(nv.ma_nv || '').toUpperCase().replace(/\s+/g, '');
+        return maDb === maChuan || maDb === `FNV${soMa}` || maDb === soMa;
+      });
 
       if (nvTimThay) {
         const { error: updateErr } = await supabaseAdmin
@@ -142,18 +173,27 @@ export async function POST(req: Request) {
 💾 Hệ thống đã tự động lưu mã này vào hồ sơ nhân sự của bạn!`
           );
           return NextResponse.json({ ok: true, linked: nvTimThay.ma_nv, chatId });
+        } else {
+          await guiTinNhanZalo(
+            botConfig.url,
+            chatId,
+            `⚠️ Tìm thấy <b>${nvTimThay.ho_ten}</b> nhưng không lưu được vào DB (${updateErr.message}).\n🆔 Chat ID: <code>${chatId}</code>`
+          );
+          return NextResponse.json({ ok: false, error: updateErr.message });
         }
       } else {
+        const goiYKey = !process.env.SUPABASE_SERVICE_ROLE_KEY
+          ? '\n<i>(Lưu ý IT: Chưa cấu hình SUPABASE_SERVICE_ROLE_KEY trên server)</i>'
+          : '';
         await guiTinNhanZalo(
           botConfig.url,
           chatId,
-          `⚠️ Không tìm thấy mã nhân viên <b>${maChuan}</b> trên hệ thống.\n\n🆔 Mã Chat ID của bạn trên <b>${botConfig.tenBot}</b> là:\n<code>${chatId}</code>\n\nVui lòng kiểm tra lại mã NV hoặc gửi mã ID trên cho HCNS/IT.`
+          `⚠️ Không tìm thấy mã nhân viên <b>${maChuan}</b> trên hệ thống.${goiYKey}\n\n🆔 Mã Chat ID của bạn trên <b>${botConfig.tenBot}</b> là:\n<code>${chatId}</code>`
         );
         return NextResponse.json({ ok: true, notFound: maChuan, chatId });
       }
     }
 
-    // Phản hồi Chat ID + hướng dẫn nếu nhân viên nhắn nội dung khác
     await guiTinNhanZalo(
       botConfig.url,
       chatId,
@@ -163,7 +203,7 @@ export async function POST(req: Request) {
 <code>${chatId}</code>
 
 👉 <b>Cách tự động cập nhật vào hồ sơ:</b>
-Hãy nhắn đúng <b>Mã nhân viên</b> của bạn vào đây (Ví dụ: <b>FNV-115</b>) để hệ thống tự lưu ngay lập tức!`
+Hãy nhắn đúng <b>Mã nhân viên</b> của bạn vào đây (Ví dụ: <b>FNV-113</b>) để hệ thống tự lưu ngay lập tức!`
     );
 
     return NextResponse.json({ ok: true, repliedChatId: chatId });
