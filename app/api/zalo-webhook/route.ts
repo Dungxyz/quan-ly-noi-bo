@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase as supabaseAdmin } from '@/lib/supabase';
 
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  supabaseKey
-);
-
 const CAU_HINH_6_BOT: Record<
   string,
   { tenBot: string; url: string; groupId: string; secretToken: string; cotDb: string }
@@ -77,7 +67,6 @@ export async function GET(req: Request) {
   const botSo = searchParams.get('bot') || '1';
   return NextResponse.json({
     ok: true,
-    hasServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     message: `Zalo Webhook Bình Phước Ford đang hoạt động (Bot ${botSo})`,
   });
 }
@@ -115,7 +104,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, ignored: 'Không tìm thấy chat_id' });
     }
 
-    // Nếu nhắn từ nhóm chat -> chỉ trả mã Group ID, không ghi đè vào hồ sơ cá nhân
     const isGroupChat =
       chatType === 'group' ||
       (botConfig.groupId && chatId === botConfig.groupId.trim());
@@ -132,7 +120,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, groupChatId: chatId });
     }
 
-    // Nhận diện mã nhân viên (VD: FNV-113, fnv 113, 113)
     const cleanText = textNhan.toUpperCase().replace(/\s+/g, '');
     const matchMaNV = cleanText.match(/^(FNV-?)?(\d{1,5})$/);
 
@@ -154,7 +141,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: queryErr.message });
       }
 
-      // Khớp chính xác phần số của mã nhân viên (tránh FNV-11 khớp nhầm FNV-113)
       const nvTimThay = (dsNV || []).find((nv) => {
         const maDb = String(nv.ma_nv || '').toUpperCase().replace(/\s+/g, '');
         return maDb === maChuan || maDb === `FNV${soMa}` || maDb === soMa;
@@ -187,13 +173,10 @@ export async function POST(req: Request) {
           return NextResponse.json({ ok: false, error: updateErr.message });
         }
       } else {
-        const goiYKey = !process.env.SUPABASE_SERVICE_ROLE_KEY
-          ? '\n<i>(Lưu ý IT: Chưa cấu hình SUPABASE_SERVICE_ROLE_KEY trên server)</i>'
-          : '';
         await guiTinNhanZalo(
           botConfig.url,
           chatId,
-          `⚠️ Không tìm thấy mã nhân viên <b>${maChuan}</b> trên hệ thống.${goiYKey}\n\n🆔 Mã Chat ID của bạn trên <b>${botConfig.tenBot}</b> là:\n<code>${chatId}</code>`
+          `⚠️ Không tìm thấy mã nhân viên <b>${maChuan}</b> trên hệ thống.\n\n🆔 Mã Chat ID của bạn trên <b>${botConfig.tenBot}</b> là:\n<code>${chatId}</code>`
         );
         return NextResponse.json({ ok: true, notFound: maChuan, chatId });
       }
