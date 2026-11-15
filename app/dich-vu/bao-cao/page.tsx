@@ -129,6 +129,68 @@ export default function BaoCaoDichVuPage() {
     }
   }, [canView]);
 
+  // =========================================================================
+  // TÍNH TOÁN KPI & BẢNG TỔNG HỢP (GIỐNG BÁO CÁO ĐẶT HOA)
+  // =========================================================================
+  const bcTongXe = duLieuHienThi.length;
+  const bcHenTruoc = duLieuHienThi.filter((r) => {
+    const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
+    return tt === '24H' || tt === 'H' || tt.includes('HẸN');
+  }).length;
+  const bcVangLai = duLieuHienThi.filter((r) => {
+    const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
+    return tt === 'XVL' || tt.includes('VÃNG LAI');
+  }).length;
+  const bcYeuCau = duLieuHienThi.filter((r) => {
+    const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
+    return tt === 'YC' || tt.includes('YÊU CẦU');
+  }).length;
+  const bcBDDK = duLieuHienThi.filter((r) => {
+    const hm = String(r.hang_muc_thuc_hien || r.hang_muc || '').toUpperCase().trim();
+    return hm === 'BDĐK' || hm.includes('BẢO DƯỠNG');
+  }).length;
+
+  // Bảng tổng hợp 1: Theo Cố vấn dịch vụ
+  const thongKeCVMap: Record<
+    string,
+    { ten: string; tong: number; hen: number; xvl: number; yc: number }
+  > = {};
+  duLieuHienThi.forEach((r) => {
+    const tenCV = String(r.co_van_vien || r.ten_co_van || 'Chưa phân cố vấn').trim();
+    const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
+
+    if (!thongKeCVMap[tenCV]) {
+      thongKeCVMap[tenCV] = { ten: tenCV, tong: 0, hen: 0, xvl: 0, yc: 0 };
+    }
+    thongKeCVMap[tenCV].tong += 1;
+    if (tt === '24H' || tt === 'H' || tt.includes('HẸN')) {
+      thongKeCVMap[tenCV].hen += 1;
+    } else if (tt === 'XVL' || tt.includes('VÃNG LAI')) {
+      thongKeCVMap[tenCV].xvl += 1;
+    } else if (tt === 'YC' || tt.includes('YÊU CẦU')) {
+      thongKeCVMap[tenCV].yc += 1;
+    }
+  });
+  const dsThongKeCV = Object.values(thongKeCVMap).sort((a, b) => b.tong - a.tong);
+
+  // Bảng tổng hợp 2: Theo Hạng mục thực hiện
+  const thongKeHMMap: Record<string, { ten: string; tong: number; hen: number; xvl: number }> = {};
+  duLieuHienThi.forEach((r) => {
+    const tenHM = String(r.hang_muc_thuc_hien || r.hang_muc || 'Khác').trim();
+    const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
+
+    if (!thongKeHMMap[tenHM]) {
+      thongKeHMMap[tenHM] = { ten: tenHM, tong: 0, hen: 0, xvl: 0 };
+    }
+    thongKeHMMap[tenHM].tong += 1;
+    if (tt === '24H' || tt === 'H' || tt.includes('HẸN')) {
+      thongKeHMMap[tenHM].hen += 1;
+    } else if (tt === 'XVL' || tt.includes('VÃNG LAI')) {
+      thongKeHMMap[tenHM].xvl += 1;
+    }
+  });
+  const dsThongKeHM = Object.values(thongKeHMMap).sort((a, b) => b.tong - a.tong);
+
   // 4. Xuất file Excel CSV thông thường
   function handleXuatExcel() {
     if (!canExcel) {
@@ -283,65 +345,120 @@ export default function BaoCaoDichVuPage() {
 
   const responsiveFilterInput = {
     ...filterInputStyle,
-    fontSize: isMobile ? '14px' : '12px',
-    padding: isMobile ? '9px 10px' : '7px 10px',
+    fontSize: isMobile ? '14px' : '13px',
+    padding: isMobile ? '9px 10px' : '8px 10px',
   };
 
   return (
     <div
       style={{
-        padding: isMobile ? '14px 12px 24px 12px' : '24px',
+        padding: isMobile ? '12px' : '20px',
         backgroundColor: '#f8fafc',
         minHeight: '100vh',
         fontFamily: 'Segoe UI, sans-serif',
         boxSizing: 'border-box',
+        width: '100%',
+        overflowX: 'hidden',
       }}
     >
+      {/* 1. HEADER CHUNG (ĐỒNG BỘ PHONG CÁCH BÁO CÁO ĐẶT HOA) */}
       <div
         style={{
           backgroundColor: '#fff',
-          borderRadius: '8px',
-          border: '1px solid #e2e8f0',
-          padding: isMobile ? '16px 14px' : '20px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          padding: isMobile ? '14px' : '16px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          marginBottom: '16px',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'stretch' : 'center',
+          gap: '12px',
         }}
       >
-        {/* HEADER TOOLBAR */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '8px',
-            marginBottom: '16px',
-          }}
-        >
-          <h2 style={{ fontSize: isMobile ? '14px' : '15px', fontWeight: 'bold', color: '#0284c7', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>📍</span> TRÍCH XUẤT BÁO CÁO DỊCH VỤ
+        <div>
+          <h2 style={{ margin: 0, fontSize: isMobile ? '17px' : '20px', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>📊</span> BÁO CÁO TIẾP NHẬN DỊCH VỤ
           </h2>
-          <span
-            style={{
-              backgroundColor: '#0f172a',
-              color: '#fff',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              padding: '4px 12px',
-              borderRadius: '12px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Kết quả lọc: {duLieuHienThi.length} xe
-          </span>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
+            Thống kê lượt xe vào xưởng theo Cố vấn dịch vụ, Hạng mục thực hiện và Trạng thái hẹn.
+          </p>
         </div>
 
-        {/* INPUT BỘ LỌC */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+          {canExcel && (
+            <button
+              type="button"
+              onClick={handleXuatExcel}
+              style={{
+                flex: isMobile ? '1 1 auto' : 'none',
+                backgroundColor: '#16a34a',
+                color: '#fff',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span>📥</span> Xuất Excel (CSV)
+            </button>
+          )}
+
+          {canMau && (
+            <button
+              type="button"
+              onClick={handleXuatBaoCaoNgayMau}
+              style={{
+                flex: isMobile ? '1 1 auto' : 'none',
+                backgroundColor: '#eab308',
+                color: '#0f172a',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span>📑</span> BC Ngày (Mẫu)
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. THANH BỘ LỌC */}
+      <div
+        style={{
+          backgroundColor: '#fff',
+          padding: isMobile ? '12px' : '14px 16px',
+          borderRadius: '10px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'stretch' : 'flex-end',
+          gap: '12px',
+          marginBottom: '16px',
+        }}
+      >
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: isTinyMobile ? '1fr' : isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
-            gap: isMobile ? '10px' : '14px',
-            marginBottom: '16px',
+            gridTemplateColumns: isTinyMobile ? '1fr' : isMobile ? '1fr 1fr' : 'repeat(4, minmax(160px, 1fr))',
+            gap: '10px',
+            flex: 1,
           }}
         >
           <div style={{ minWidth: 0 }}>
@@ -369,7 +486,7 @@ export default function BaoCaoDichVuPage() {
             <select
               value={coVan}
               onChange={(e) => setCoVan(e.target.value)}
-              style={responsiveFilterInput}
+              style={{ ...responsiveFilterInput, backgroundColor: '#fff' }}
             >
               <option value="">-- Tất cả cố vấn --</option>
               {danhSachCoVan.map((nv) => (
@@ -385,7 +502,7 @@ export default function BaoCaoDichVuPage() {
             <select
               value={hangMuc}
               onChange={(e) => setHangMuc(e.target.value)}
-              style={responsiveFilterInput}
+              style={{ ...responsiveFilterInput, backgroundColor: '#fff' }}
             >
               <option value="">-- Tất cả hạng mục --</option>
               {dsHangMuc.map((item, idx) => (
@@ -397,91 +514,168 @@ export default function BaoCaoDichVuPage() {
           </div>
         </div>
 
-        {/* CÁC NÚT THAO TÁC */}
-        <div
+        <button
+          type="button"
+          onClick={() => handleLoc()}
+          disabled={loading}
           style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            marginBottom: '18px',
+            backgroundColor: '#0284c7',
+            color: '#fff',
+            border: 'none',
+            padding: isMobile ? '10px 16px' : '9px 20px',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap',
           }}
         >
-          <button
-            type="button"
-            onClick={() => handleLoc()}
-            disabled={loading}
-            style={{
-              flex: isMobile ? '1 1 auto' : 'none',
-              backgroundColor: '#0284c7',
-              color: '#fff',
-              border: 'none',
-              padding: isMobile ? '10px 14px' : '8px 16px',
-              borderRadius: '6px',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span>🔍</span> {loading ? 'Đang lọc...' : 'Lọc'}
-          </button>
+          <span>🔍</span> {loading ? 'Đang lọc...' : 'Lọc dữ liệu'}
+        </button>
+      </div>
 
-          {canExcel && (
-            <button
-              type="button"
-              onClick={handleXuatExcel}
-              style={{
-                flex: isMobile ? '1 1 auto' : 'none',
-                backgroundColor: '#16a34a',
-                color: '#fff',
-                border: 'none',
-                padding: isMobile ? '10px 14px' : '8px 16px',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span>📗</span> Xuất Excel
-            </button>
-          )}
-
-          {canMau && (
-            <button
-              type="button"
-              onClick={handleXuatBaoCaoNgayMau}
-              style={{
-                flex: isMobile ? '1 1 100%' : 'none',
-                backgroundColor: '#eab308',
-                color: '#000',
-                border: 'none',
-                padding: isMobile ? '10px 14px' : '8px 16px',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span>📑</span> BC Ngày (Mẫu)
-            </button>
-          )}
+      {/* 3. 5 THẺ KPI TỔNG QUAN */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+          gap: '10px',
+          marginBottom: '16px',
+        }}
+      >
+        <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>TỔNG LƯỢT XE</div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#0f172a', marginTop: '4px' }}>{bcTongXe}</div>
         </div>
 
-        {/* HIỂN THỊ KẾT QUẢ BÁO CÁO */}
+        <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>XE HẸN TRƯỚC (24H / H)</div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#16a34a', marginTop: '4px' }}>{bcHenTruoc}</div>
+        </div>
+
+        <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>XE VÃNG LAI (XVL)</div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#d97706', marginTop: '4px' }}>{bcVangLai}</div>
+        </div>
+
+        <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '10px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>XE YÊU CẦU (YC)</div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#dc2626', marginTop: '4px' }}>{bcYeuCau}</div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: '#fff',
+            padding: '14px',
+            borderRadius: '10px',
+            borderLeft: '4px solid #9333ea',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+            gridColumn: isMobile ? 'span 2' : 'auto',
+          }}
+        >
+          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>BẢO DƯỠNG ĐỊNH KỲ (BDĐK)</div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#7e22ce', marginTop: '4px' }}>{bcBDDK}</div>
+        </div>
+      </div>
+
+      {/* 4. 2 BẢNG TỔNG HỢP THEO CỐ VẤN VIÊN & HẠNG MỤC */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gap: '16px',
+          marginBottom: '16px',
+        }}
+      >
+        {/* Bảng trái: Thống kê theo Cố vấn dịch vụ */}
+        <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+          <h3 style={{ margin: '0 0 10px', fontSize: '14px', color: '#0f172a' }}>👨‍🔧 Thống kê theo Cố vấn dịch vụ</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '8px' }}>Cố vấn dịch vụ</th>
+                <th style={{ padding: '8px', textAlign: 'center' }}>Tổng xe</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Hẹn (24H/H)</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>XVL</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#dc2626' }}>YC</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dsThongKeCV.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '14px', textAlign: 'center', color: '#94a3b8' }}>Chưa có dữ liệu</td>
+                </tr>
+              ) : (
+                dsThongKeCV.map((cv) => (
+                  <tr key={cv.ten} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px', fontWeight: '600', color: '#0f172a' }}>{cv.ten}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{cv.tong}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', color: '#16a34a', fontWeight: '600' }}>{cv.hen}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', color: '#d97706', fontWeight: '600' }}>{cv.xvl}</td>
+                    <td style={{ padding: '8px', textAlign: 'center', color: '#dc2626', fontWeight: '600' }}>{cv.yc}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Bảng phải: Tổng hợp theo Hạng mục thực hiện */}
+        <div style={{ backgroundColor: '#fff', borderRadius: '10px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+          <h3 style={{ margin: '0 0 10px', fontSize: '14px', color: '#0f172a' }}>🔧 Tổng hợp theo Hạng mục thực hiện</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ padding: '8px' }}>Hạng mục</th>
+                <th style={{ padding: '8px', textAlign: 'center' }}>Số lượng</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Hẹn</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>XVL</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#0284c7' }}>Tỷ trọng</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dsThongKeHM.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '14px', textAlign: 'center', color: '#94a3b8' }}>Chưa có dữ liệu</td>
+                </tr>
+              ) : (
+                dsThongKeHM.map((hm) => {
+                  const tyTrong = bcTongXe > 0 ? Math.round((hm.tong / bcTongXe) * 100) : 0;
+                  return (
+                    <tr key={hm.ten} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px', fontWeight: 'bold', color: '#0f172a' }}>{hm.ten}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{hm.tong}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#16a34a', fontWeight: '600' }}>{hm.hen}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>{hm.xvl}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#0284c7', fontWeight: 'bold' }}>{tyTrong}%</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 5. BẢNG KÊ CHI TIẾT LƯỢT XE */}
+      <div
+        style={{
+          backgroundColor: '#fff',
+          borderRadius: '10px',
+          padding: isMobile ? '12px' : '14px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', color: '#0f172a' }}>
+            📋 Bảng kê chi tiết xe tiếp nhận ({duLieuHienThi.length} xe)
+          </h3>
+        </div>
+
         {duLieuHienThi.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px' }}>
             {loading ? 'Đang trích xuất dữ liệu...' : 'Không có dữ liệu trong khoảng thời gian này.'}
@@ -505,7 +699,6 @@ export default function BaoCaoDichVuPage() {
                     backgroundColor: '#fff',
                   }}
                 >
-                  {/* Hàng 1: STT + Biển số + Hạng mục & Trạng thái */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
@@ -526,13 +719,11 @@ export default function BaoCaoDichVuPage() {
                     </div>
                   </div>
 
-                  {/* Hàng 2: Khách hàng + SĐT */}
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', marginBottom: '4px' }}>
                     👤 {r.ten_khach_hang || '---'}
                     {r.so_dien_thoai ? <span style={{ fontWeight: 'normal', color: '#475569' }}> • 📞 {r.so_dien_thoai}</span> : ''}
                   </div>
 
-                  {/* Hàng 3: Cố vấn + Thời gian */}
                   <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div>🧑‍💼 CVDV: <strong>{coVanHienThi}</strong></div>
                     <div>
@@ -540,7 +731,6 @@ export default function BaoCaoDichVuPage() {
                     </div>
                   </div>
 
-                  {/* Hàng 4: Ghi chú (nếu có) */}
                   {r.ghi_chu && (
                     <div style={{ fontSize: '12px', color: '#475569', backgroundColor: '#f8fafc', padding: '5px 8px', borderRadius: '4px', marginTop: '6px' }}>
                       📝 {r.ghi_chu}
@@ -553,9 +743,9 @@ export default function BaoCaoDichVuPage() {
         ) : (
           /* BẢNG DỮ LIỆU ĐẦY ĐỦ TRÊN MÁY TÍNH */
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left', minWidth: '720px' }}>
               <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '12px' }}>
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', color: '#334155' }}>
                   <th style={{ padding: '10px 12px' }}>NO.</th>
                   <th style={{ padding: '10px 12px' }}>THỜI GIAN</th>
                   <th style={{ padding: '10px 12px' }}>BIỂN SỐ</th>
@@ -585,7 +775,7 @@ export default function BaoCaoDichVuPage() {
                       <td style={{ padding: '10px 12px', fontWeight: '600', color: '#0f172a' }}>
                         {r.ten_khach_hang || '---'}
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#334155' }}>
+                      <td style={{ padding: '10px 12px', color: '#334155', fontWeight: '500' }}>
                         {coVanHienThi}
                       </td>
                       <td style={{ padding: '10px 12px', color: '#334155' }}>
@@ -616,18 +806,18 @@ export default function BaoCaoDichVuPage() {
 
 const labelStyle = {
   display: 'block',
-  fontSize: '12px',
-  fontWeight: '600' as const,
-  color: '#334155',
-  marginBottom: '5px',
+  fontSize: '11px',
+  fontWeight: 'bold' as const,
+  color: '#475569',
+  marginBottom: '4px',
 };
 
 const filterInputStyle = {
   width: '100%',
-  padding: '7px 10px',
+  padding: '8px 10px',
   borderRadius: '6px',
   border: '1px solid #cbd5e1',
-  fontSize: '12px',
+  fontSize: '13px',
   outline: 'none',
   boxSizing: 'border-box' as const,
 };
