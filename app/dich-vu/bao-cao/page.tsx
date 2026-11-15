@@ -145,10 +145,6 @@ export default function BaoCaoDichVuPage() {
     const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
     return tt === 'YC' || tt.includes('YÊU CẦU');
   }).length;
-  const bcBDDK = duLieuHienThi.filter((r) => {
-    const hm = String(r.hang_muc_thuc_hien || r.hang_muc || '').toUpperCase().trim();
-    return hm === 'BDĐK' || hm.includes('BẢO DƯỠNG');
-  }).length;
 
   // Bảng tổng hợp 1: Theo Cố vấn dịch vụ
   const thongKeCVMap: Record<
@@ -544,7 +540,7 @@ export default function BaoCaoDichVuPage() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)',
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
           gap: '10px',
           marginBottom: '16px',
         }}
@@ -569,19 +565,6 @@ export default function BaoCaoDichVuPage() {
           <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#dc2626', marginTop: '4px' }}>{bcYeuCau}</div>
         </div>
 
-        <div
-          style={{
-            backgroundColor: '#fff',
-            padding: '14px',
-            borderRadius: '10px',
-            borderLeft: '4px solid #9333ea',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-            gridColumn: isMobile ? 'span 2' : 'auto',
-          }}
-        >
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>BẢO DƯỠNG ĐỊNH KỲ (BDĐK)</div>
-          <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#7e22ce', marginTop: '4px' }}>{bcBDDK}</div>
-        </div>
       </div>
 
       {/* 4. 2 BẢNG TỔNG HỢP THEO CỐ VẤN VIÊN & HẠNG MỤC */}
