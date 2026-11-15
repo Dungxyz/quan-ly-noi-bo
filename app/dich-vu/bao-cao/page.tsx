@@ -174,19 +174,21 @@ export default function BaoCaoDichVuPage() {
   const dsThongKeCV = Object.values(thongKeCVMap).sort((a, b) => b.tong - a.tong);
 
   // Bảng tổng hợp 2: Theo Hạng mục thực hiện
-  const thongKeHMMap: Record<string, { ten: string; tong: number; hen: number; xvl: number }> = {};
+  const thongKeHMMap: Record<string, { ten: string; tong: number; hen: number; xvl: number; yc: number }> = {};
   duLieuHienThi.forEach((r) => {
     const tenHM = String(r.hang_muc_thuc_hien || r.hang_muc || 'Khác').trim();
     const tt = String(r.trang_thai_hen || r.trang_thai || '').toUpperCase().trim();
 
     if (!thongKeHMMap[tenHM]) {
-      thongKeHMMap[tenHM] = { ten: tenHM, tong: 0, hen: 0, xvl: 0 };
+      thongKeHMMap[tenHM] = { ten: tenHM, tong: 0, hen: 0, xvl: 0, yc: 0 };
     }
     thongKeHMMap[tenHM].tong += 1;
     if (tt === '24H' || tt === 'H' || tt.includes('HẸN')) {
       thongKeHMMap[tenHM].hen += 1;
     } else if (tt === 'XVL' || tt.includes('VÃNG LAI')) {
       thongKeHMMap[tenHM].xvl += 1;
+    } else if (tt === 'YC' || tt.includes('YÊU CẦU')) {
+      thongKeHMMap[tenHM].yc += 1;
     }
   });
   const dsThongKeHM = Object.values(thongKeHMMap).sort((a, b) => b.tong - a.tong);
@@ -634,13 +636,14 @@ export default function BaoCaoDichVuPage() {
                 <th style={{ padding: '8px', textAlign: 'center' }}>Số lượng</th>
                 <th style={{ padding: '8px', textAlign: 'center', color: '#16a34a' }}>Hẹn</th>
                 <th style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>XVL</th>
+                <th style={{ padding: '8px', textAlign: 'center', color: '#dc2626' }}>YC</th>
                 <th style={{ padding: '8px', textAlign: 'center', color: '#0284c7' }}>Tỷ trọng</th>
               </tr>
             </thead>
             <tbody>
               {dsThongKeHM.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '14px', textAlign: 'center', color: '#94a3b8' }}>Chưa có dữ liệu</td>
+                  <td colSpan={6} style={{ padding: '14px', textAlign: 'center', color: '#94a3b8' }}>Chưa có dữ liệu</td>
                 </tr>
               ) : (
                 dsThongKeHM.map((hm) => {
@@ -650,7 +653,8 @@ export default function BaoCaoDichVuPage() {
                       <td style={{ padding: '8px', fontWeight: 'bold', color: '#0f172a' }}>{hm.ten}</td>
                       <td style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{hm.tong}</td>
                       <td style={{ padding: '8px', textAlign: 'center', color: '#16a34a', fontWeight: '600' }}>{hm.hen}</td>
-                      <td style={{ padding: '8px', textAlign: 'center', color: '#d97706' }}>{hm.xvl}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#d97706', fontWeight: '600' }}>{hm.xvl}</td>
+                      <td style={{ padding: '8px', textAlign: 'center', color: '#dc2626', fontWeight: '600' }}>{hm.yc}</td>
                       <td style={{ padding: '8px', textAlign: 'center', color: '#0284c7', fontWeight: 'bold' }}>{tyTrong}%</td>
                     </tr>
                   );
