@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AuthProvider } from '@/context/AuthContext';
 import Sidebar from '@/components/layout/Sidebar';
+import { Analytics } from "@vercel/analytics/next";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -117,6 +118,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           )}
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
