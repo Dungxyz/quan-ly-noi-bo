@@ -253,7 +253,7 @@ export default function KhachHangHenPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '20px' }}>📅</span>
               <h1 style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
-                DANH SÁCH KHÁCH HÀNG HẸN
+                DANH SÁCH KHÁCH HÀNG
               </h1>
             </div>
             <span

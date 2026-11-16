@@ -58,7 +58,7 @@ export default function Sidebar({ isMobile = false, mobileOpen = false, onCloseM
       moduleKey: 'TN_VIEW',
     },
     {
-      name: 'Khách hàng hẹn',
+      name: 'Khách hàng dịch vụ',
       path: '/dich-vu/khach-hang',
       icon: '📅',
       moduleKey: 'HEN_VIEW',
