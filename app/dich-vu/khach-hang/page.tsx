@@ -286,33 +286,15 @@ export default function KhachHangHenPage() {
     return () => clearTimeout(timer);
   }, [tuKhoa, activeTab]);
 
-  // 2. Tải file Excel mẫu ĐÚNG 7 CỘT (có thêm cột Ghi chú ở cuối)
+  // 2. Tải file Excel mẫu có sẵn của công ty từ thư mục public/
   function handleTaiFileMau() {
     const tg = getThongTinThoiGianVN();
-    const mauData = [
-      {
-        'Biển số': '51M00162',
-        'Khách hàng': 'Bùi Đức Huy',
-        'Hạng mục thực hiện': 'BDĐK',
-        'Trạng thái hẹn': '24H',
-        'Số điện thoại': '0974737864',
-        'Cố vấn viên': 'FNV-070 Lê Phạm Anh Tuấn',
-        'Ghi chú': 'Khách hẹn 8h30 sáng, rửa xe kỹ',
-      },
-      {
-        'Biển số': '60K96532',
-        'Khách hàng': 'ANH XUYÊN',
-        'Hạng mục thực hiện': 'BDĐK',
-        'Trạng thái hẹn': '24H',
-        'Số điện thoại': '0867733105',
-        'Cố vấn viên': 'FNV-070 Lê Phạm Anh Tuấn',
-        'Ghi chú': '',
-      },
-    ];
-    const ws = XLSX.utils.json_to_sheet(mauData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'KhachHen24H');
-    XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`);
+    const link = document.createElement('a');
+    link.href = '/Mau_Khach_Hen_24H.xlsx';
+    link.download = `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // 3. Import Excel Khách hẹn 24H: XÓA DANH SÁCH 24H CŨ TRƯỚC KHI NẠP DANH SÁCH MỚI (đọc cả cột Ghi chú)
