@@ -176,7 +176,6 @@ export default function LoginPage() {
                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
                   MẬT KHẨU
                 </label>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Mặc định: 123456</span>
               </div>
               <input
                 type="password"
