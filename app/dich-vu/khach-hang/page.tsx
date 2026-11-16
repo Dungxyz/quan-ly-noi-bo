@@ -52,6 +52,18 @@ function chuanHoaBienSo(bs: string) {
     .trim();
 }
 
+// Hàm lấy giá trị cột linh hoạt (bỏ qua xuống dòng, khoảng trắng thừa, hoa/thường trong header Excel)
+function layGiaTriCot(row: Record<string, any>, danhSachTenCot: string[]): string {
+  const entries = Object.entries(row);
+  for (const [key, val] of entries) {
+    const keyChuan = key.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (danhSachTenCot.includes(keyChuan)) {
+      return String(val ?? '').trim();
+    }
+  }
+  return '';
+}
+
 export default function KhachHangHenPage() {
   const { currentUser, kiemTraQuyen } = useAuth();
   const [screenWidth, setScreenWidth] = useState(1200);
@@ -67,10 +79,8 @@ export default function KhachHangHenPage() {
   const isSmallMobile = screenWidth < 640;
   const isMobile = screenWidth < 768;
 
-  // 3 Tab: '24H' (Hẹn ngày mai - Excel) | 'H' (Hẹn trong ngày - Form) | 'TONG' (Danh sách khách hàng tổng)
   const [activeTab, setActiveTab] = useState<'24H' | 'H' | 'TONG'>('24H');
 
-  // Khởi tạo giá trị tĩnh mặc định để tránh lỗi prerender Next.js
   const [thoiGian, setThoiGian] = useState({
     homNayStr: '',
     ngayMaiStr: '',
@@ -189,19 +199,19 @@ export default function KhachHangHenPage() {
     return () => clearTimeout(timer);
   }, [tuKhoa, activeTab]);
 
-  // 2. Tải file Excel mẫu khớp tên cột bảng dich_vu_khach_hang
+  // 2. Tải file Excel mẫu khớp đúng header file 24H của bạn
   function handleTaiFileMau() {
     const tg = getThongTinThoiGianVN();
     const mauData = [
       {
-        'BIỂN SỐ': '93C14919',
-        'KHÁCH HÀNG': 'Anh Cơ',
-        'SỐ ĐIỆN THOẠI': '0935291293',
+        'Biển số': '93A45395',
+        'Khách hàng': 'Anh Hải',
+        'Số điện thoại': '0348772415',
       },
       {
-        'BIỂN SỐ': '93C16134',
-        'KHÁCH HÀNG': 'Anh Thịnh',
-        'SỐ ĐIỆN THOẠI': '0913917886',
+        'Biển số': '93A47922',
+        'Khách hàng': 'NGUYỄN ĐỨC NHÂN',
+        'Số điện thoại': '0918405374',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(mauData);
@@ -229,7 +239,7 @@ export default function KhachHangHenPage() {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
-      const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+      const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
 
       if (!rows || rows.length === 0) {
         alert('File Excel không có dữ liệu!');
@@ -240,18 +250,19 @@ export default function KhachHangHenPage() {
       const mapKhachTong = new Map<string, KhachHangTongItem>();
 
       for (const row of rows) {
-        const rawBienSo =
-          row['BIỂN SỐ'] || row['Biển số'] || row['bien_so'] || row['BienSo'] || '';
-        const rawTen =
-          row['KHÁCH HÀNG'] || row['Tên khách hàng'] || row['ten_khach_hang'] || row['TenKhachHang'] || '';
-        const rawSdt =
-          row['SỐ ĐIỆN THOẠI'] || row['Số điện thoại'] || row['SĐT'] || row['so_dien_thoai'] || '';
+        const rawBienSo = layGiaTriCot(row, ['biển số', 'bien_so', 'bienso']);
+        const rawTen = layGiaTriCot(row, ['khách hàng', 'tên khách hàng', 'ten_khach_hang', 'tenkhachhang']);
+        const rawSdt = layGiaTriCot(row, ['số điện thoại', 'sđt', 'sdt', 'so_dien_thoai', 'sodienthoai']);
 
         const bs = chuanHoaBienSo(rawBienSo);
-        const ten = String(rawTen || '').trim();
+        const ten = rawTen.trim();
         if (!bs || !ten) continue;
 
-        const sdt = String(rawSdt || '').trim();
+        // Giữ nguyên số 0 đầu của số điện thoại nếu Excel làm mất số 0 (9 chữ số bắt đầu bằng 3,5,7,8,9)
+        let sdt = rawSdt.replace(/\s+/g, '').trim();
+        if (/^[35789]\d{8}$/.test(sdt)) {
+          sdt = '0' + sdt;
+        }
 
         mapHen.set(bs, {
           ngay_hen: tgCheck.ngayMaiStr,
@@ -270,7 +281,7 @@ export default function KhachHangHenPage() {
 
       const danhSachImport = Array.from(mapHen.values());
       if (danhSachImport.length === 0) {
-        alert('Không đọc được dòng hợp lệ. Vui lòng kiểm tra tiêu đề cột Excel: "BIỂN SỐ", "KHÁCH HÀNG", "SỐ ĐIỆN THOẠI".');
+        alert('Không đọc được dòng hợp lệ. Vui lòng kiểm tra file có các cột: "Biển số", "Khách hàng", "Số điện thoại".');
         return;
       }
 
