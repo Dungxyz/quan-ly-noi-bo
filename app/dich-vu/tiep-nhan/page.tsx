@@ -5,10 +5,10 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
 function getHomNayVN(): string {
-  const nowVN = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-  const yyyy = nowVN.getFullYear();
-  const mm = String(nowVN.getMonth() + 1).padStart(2, '0');
-  const dd = String(nowVN.getDate()).padStart(2, '0');
+  const vnTime = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const yyyy = vnTime.getUTCFullYear();
+  const mm = String(vnTime.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(vnTime.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 

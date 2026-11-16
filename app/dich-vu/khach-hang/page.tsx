@@ -22,21 +22,21 @@ interface KhachHangTongItem {
 }
 
 function getThongTinThoiGianVN() {
-  const nowVN = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
-  const gio = nowVN.getHours();
-  const phut = nowVN.getMinutes();
+  // Tính giờ Việt Nam (UTC+7) thuần toán học, chạy ổn định trên cả Server Build lẫn Trình duyệt
+  const vnTime = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const gio = vnTime.getUTCHours();
+  const phut = vnTime.getUTCMinutes();
 
-  const formatDate = (d: Date) => {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+  const formatUTCDate = (d: Date) => {
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const homNayStr = formatDate(nowVN);
-  const ngayMai = new Date(nowVN);
-  ngayMai.setDate(ngayMai.getDate() + 1);
-  const ngayMaiStr = formatDate(ngayMai);
+  const homNayStr = formatUTCDate(vnTime);
+  const ngayMai = new Date(vnTime.getTime() + 24 * 60 * 60 * 1000);
+  const ngayMaiStr = formatUTCDate(ngayMai);
 
   return {
     homNayStr,
