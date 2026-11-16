@@ -199,19 +199,25 @@ export default function KhachHangHenPage() {
     return () => clearTimeout(timer);
   }, [tuKhoa, activeTab]);
 
-  // 2. Tải file Excel mẫu khớp đúng header file 24H của bạn
+  // 2. Tải file Excel mẫu ĐÚNG 6 CỘT khớp thứ tự bảng gốc để copy-paste không bị lệch
   function handleTaiFileMau() {
     const tg = getThongTinThoiGianVN();
     const mauData = [
       {
-        'Biển số': '93A45395',
-        'Khách hàng': 'Anh Hải',
-        'Số điện thoại': '0348772415',
+        'Biển số': '51M00162',
+        'Khách hàng': 'Bùi Đức Huy',
+        'Hạng mục thực hiện': 'BDĐK',
+        'Trạng thái hẹn': '24H',
+        'Số điện thoại': '0974737864',
+        'Cố vấn viên': 'FNV-070 Lê Phạm Anh Tuấn',
       },
       {
-        'Biển số': '93A47922',
-        'Khách hàng': 'NGUYỄN ĐỨC NHÂN',
-        'Số điện thoại': '0918405374',
+        'Biển số': '60K96532',
+        'Khách hàng': 'ANH XUYÊN',
+        'Hạng mục thực hiện': 'BDĐK',
+        'Trạng thái hẹn': '24H',
+        'Số điện thoại': '0867733105',
+        'Cố vấn viên': 'FNV-070 Lê Phạm Anh Tuấn',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(mauData);
@@ -220,7 +226,7 @@ export default function KhachHangHenPage() {
     XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`);
   }
 
-  // 3. Import Excel Khách hẹn 24H cho ngày mai (Khóa sau 23h00)
+  // 3. Import Excel Khách hẹn 24H (Tự động bắt đúng Biển số, Tên KH, SĐT dù dán 3 cột hay 6 cột)
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -239,9 +245,13 @@ export default function KhachHangHenPage() {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
-      const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+      // Đọc theo dạng mảng 2 chiều (mỗi dòng là 1 mảng các ô [A, B, C, D, E, F...]) để không bao giờ sợ lệch tiêu đề
+      const matrix: any[][] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+        header: 1,
+        defval: '',
+      });
 
-      if (!rows || rows.length === 0) {
+      if (!matrix || matrix.length === 0) {
         alert('File Excel không có dữ liệu!');
         return;
       }
@@ -249,39 +259,49 @@ export default function KhachHangHenPage() {
       const mapHen = new Map<string, KhachHangHenItem>();
       const mapKhachTong = new Map<string, KhachHangTongItem>();
 
-      for (const row of rows) {
-        const rawBienSo = layGiaTriCot(row, ['biển số', 'bien_so', 'bienso']);
-        const rawTen = layGiaTriCot(row, ['khách hàng', 'tên khách hàng', 'ten_khach_hang', 'tenkhachhang']);
-        const rawSdt = layGiaTriCot(row, ['số điện thoại', 'sđt', 'sdt', 'so_dien_thoai', 'sodienthoai']);
+      for (const cells of matrix) {
+        if (!cells || cells.length < 2) continue;
+
+        const rawBienSo = String(cells[0] ?? '').trim();
+        const rawTen = String(cells[1] ?? '').trim();
+
+        // Bỏ qua dòng tiêu đề ("Biển số", "Khách hàng"...)
+        if (!rawBienSo || rawBienSo.toLowerCase().includes('biển số') || rawBienSo.toLowerCase() === 'bien_so') {
+          continue;
+        }
 
         const bs = chuanHoaBienSo(rawBienSo);
-        const ten = rawTen.trim();
-        if (!bs || !ten) continue;
+        if (!bs || !rawTen) continue;
 
-        // Giữ nguyên số 0 đầu của số điện thoại nếu Excel làm mất số 0 (9 chữ số bắt đầu bằng 3,5,7,8,9)
-        let sdt = rawSdt.replace(/\s+/g, '').trim();
-        if (/^[35789]\d{8}$/.test(sdt)) {
-          sdt = '0' + sdt;
+        // Tự động tìm ô chứa Số điện thoại trong các cột còn lại (cột C, D, E, F...)
+        let sdt = '';
+        for (let i = 2; i < cells.length; i++) {
+          const val = String(cells[i] ?? '').replace(/[\s.-]/g, '').trim();
+          // Nhận diện chuỗi số điện thoại VN (9 đến 11 chữ số)
+          if (/^\d{9,11}$/.test(val)) {
+            sdt = /^[35789]\d{8}$/.test(val) ? '0' + val : val;
+            break;
+          }
         }
 
         mapHen.set(bs, {
           ngay_hen: tgCheck.ngayMaiStr,
           bien_so: bs,
-          ten_khach_hang: ten,
+          ten_khach_hang: rawTen,
           so_dien_thoai: sdt,
           trang_thai_hen: '24H',
         });
 
         mapKhachTong.set(bs, {
           bien_so: bs,
-          ten_khach_hang: ten,
+          ten_khach_hang: rawTen,
           so_dien_thoai: sdt,
         });
       }
 
       const danhSachImport = Array.from(mapHen.values());
       if (danhSachImport.length === 0) {
-        alert('Không đọc được dòng hợp lệ. Vui lòng kiểm tra file có các cột: "Biển số", "Khách hàng", "Số điện thoại".');
+        alert('Không đọc được dòng hợp lệ nào trong file Excel!');
         return;
       }
 
