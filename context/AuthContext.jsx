@@ -12,10 +12,20 @@ export function AuthProvider({ children }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Khởi tạo phiên đăng nhập từ localStorage
+  // Hàm Đăng xuất
+  function dangXuat() {
+    localStorage.removeItem('user_ma_nv');
+    localStorage.removeItem('user_session_token');
+    setCurrentUser(null);
+    router.push('/login');
+  }
+
+  // 1. Khởi tạo & kiểm tra phiên đăng nhập mỗi khi chuyển trang hoặc F5
   useEffect(() => {
     async function kiemTraPhien() {
       const savedMaNV = localStorage.getItem('user_ma_nv');
+      const savedToken = localStorage.getItem('user_session_token');
+
       if (savedMaNV) {
         const { data, error } = await supabase
           .from('nhan_vien')
@@ -23,10 +33,16 @@ export function AuthProvider({ children }) {
           .eq('ma_nv', savedMaNV)
           .single();
 
-        if (!error && data && data.trang_thai !== 'Đã nghỉ việc' && data.phan_quyen !== 'LOCKED') {
+        const hopLeTrangThai =
+          !error && data && data.trang_thai !== 'Đã nghỉ việc' && data.phan_quyen !== 'LOCKED';
+        // Kiểm tra trùng khớp mã phiên thiết bị (nếu DB đã có session_token)
+        const hopLeThietBi = !data?.session_token || data.session_token === savedToken;
+
+        if (hopLeTrangThai && hopLeThietBi) {
           setCurrentUser(data);
         } else {
           localStorage.removeItem('user_ma_nv');
+          localStorage.removeItem('user_session_token');
           setCurrentUser(null);
           if (pathname !== '/login') router.push('/login');
         }
@@ -38,6 +54,46 @@ export function AuthProvider({ children }) {
 
     kiemTraPhien();
   }, [pathname, router]);
+
+  // 2. Lắng nghe Realtime: Tự văng ngay lập tức nếu đăng nhập ở thiết bị khác, đổi MK, hoặc bị khóa
+  useEffect(() => {
+    if (!currentUser?.ma_nv) return;
+
+    const channel = supabase
+      .channel(`force-logout-${currentUser.ma_nv}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'nhan_vien',
+          filter: `ma_nv=eq.${currentUser.ma_nv}`,
+        },
+        (payload) => {
+          const updated = payload.new;
+          const localToken = localStorage.getItem('user_session_token');
+
+          const dangNhapMayKhac =
+            updated.session_token && updated.session_token !== localToken;
+          const biDoiMatKhau = updated.mat_khau !== currentUser.mat_khau;
+          const biKhoa =
+            updated.trang_thai === 'Đã nghỉ việc' || updated.phan_quyen === 'LOCKED';
+
+          if (dangNhapMayKhac) {
+            alert('Tài khoản của bạn vừa được đăng nhập trên một thiết bị khác. Phiên hiện tại sẽ tự đăng xuất!');
+            dangXuat();
+          } else if (biDoiMatKhau || biKhoa) {
+            alert('Mật khẩu hoặc trạng thái tài khoản vừa được Admin thay đổi. Vui lòng đăng nhập lại!');
+            dangXuat();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.ma_nv, currentUser?.mat_khau]);
 
   // Hàm Đăng nhập thực tế
   async function dangNhap(taiKhoan, matKhau) {
@@ -69,6 +125,13 @@ export function AuthProvider({ children }) {
       throw new Error('Mật khẩu không chính xác!');
     }
 
+    // Tạo mã phiên mới duy nhất cho thiết bị này và ghi đè lên Supabase để đá thiết bị cũ
+    const newSessionToken = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    await supabase
+      .from('nhan_vien')
+      .update({ session_token: newSessionToken })
+      .eq('ma_nv', data.ma_nv);
+
     // Đăng nhập thành công
     const userClean = {
       ma_nv: data.ma_nv,
@@ -77,34 +140,30 @@ export function AuthProvider({ children }) {
       vi_tri: data.vi_tri,
       phan_quyen: data.phan_quyen,
       so_dien_thoai: data.so_dien_thoai,
+      mat_khau: data.mat_khau,
+      session_token: newSessionToken,
     };
 
-    // Lưu phiên đăng nhập
+    // Lưu phiên đăng nhập vào trình duyệt hiện tại
     setCurrentUser(userClean);
     localStorage.setItem('user_ma_nv', data.ma_nv);
+    localStorage.setItem('user_session_token', newSessionToken);
 
     // Điều hướng thông minh theo phân quyền thực tế
     setTimeout(() => {
       const role = data.phan_quyen || '';
       if (role === 'ADMIN') {
-        router.push('/'); // Admin vào trang Quản lý nhân sự
+        router.push('/');
       } else if (role.includes('DEMO')) {
-        router.push('/xe-demo'); // Chỉ có quyền xe demo thì vào thẳng /xe-demo
+        router.push('/xe-demo');
       } else if (role.includes('HOA')) {
-        router.push('/dat-hoa'); // Quyền hoa vào thẳng /dat-hoa
+        router.push('/dat-hoa');
       } else {
-        router.push('/xe-demo'); 
+        router.push('/xe-demo');
       }
-    }, 2000); // Delay 2 giây để hiển thị thông báo đăng nhập thành công
+    }, 2000);
 
     return userClean;
-  }
-
-  // Hàm Đăng xuất
-  function dangXuat() {
-    localStorage.removeItem('user_ma_nv');
-    setCurrentUser(null);
-    router.push('/login');
   }
 
   // Kiểm tra quyền theo module và hành động chi tiết
@@ -113,22 +172,18 @@ export function AuthProvider({ children }) {
     const role = currentUser.phan_quyen || '';
 
     if (role === 'LOCKED') return false;
-    if (role === 'ADMIN') return true; // ADMIN có toàn quyền
+    if (role === 'ADMIN') return true;
 
     if (moduleName === 'XE_DEMO') {
       switch (action) {
         case 'view':
-          // Tất cả tài khoản có quyền DEMO đều được xem
           return role.includes('DEMO');
         case 'edit':
-          // Cho phép cập nhật thông tin xe, nhận xe, trả xe
           return role === 'DEMO_FULL' || role === 'DEMO_EDIT';
         case 'history':
-          // Chỉ Quản trị hoặc Điều phối mới được tra cứu lịch sử
           return role === 'DEMO_FULL';
         case 'create':
         case 'delete':
-          // Chỉ Admin hoặc quản lý xe mới được tạo hoặc xóa xe khỏi hệ thống
           return role === 'DEMO_FULL';
         default:
           return false;
@@ -140,56 +195,6 @@ export function AuthProvider({ children }) {
 
     return false;
   }
-
-  useEffect(() => {
-  if (!currentUser?.id) return;
-
-  // 1. Kiểm tra ngay khi nhân viên vừa tải lại trang (F5)
-  const checkSession = async () => {
-    const { data } = await supabase
-      .from('nhan_su')
-      .select('session_version, trang_thai')
-      .eq('id', currentUser.id)
-      .single();
-
-    if (
-      data &&
-      (data.session_version !== currentUser.session_version || data.trang_thai === 'Khóa')
-    ) {
-      alert('Thông tin tài khoản vừa được Admin cập nhật. Vui lòng đăng nhập lại!');
-      dangXuat();
-    }
-  };
-  checkSession();
-
-  // 2. Lắng nghe Realtime: Đá văng ngay lập tức khi Admin vừa bấm Lưu
-  const channel = supabase
-    .channel(`force-logout-${currentUser.id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'nhan_su',
-        filter: `id=eq.${currentUser.id}`,
-      },
-      (payload) => {
-        const updated = payload.new;
-        if (
-          updated.session_version !== currentUser.session_version ||
-          updated.trang_thai === 'Khóa'
-        ) {
-          alert('Mật khẩu của bạn vừa được Admin thay đổi. Vui lòng đăng nhập lại!');
-          dangXuat();
-        }
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [currentUser]);
 
   return (
     <AuthContext.Provider value={{ currentUser, loadingUser, dangNhap, dangXuat, kiemTraQuyen }}>
