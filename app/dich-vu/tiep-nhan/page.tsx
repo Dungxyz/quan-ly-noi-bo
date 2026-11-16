@@ -4,6 +4,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
+function getHomNayVN(): string {
+  const nowVN = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  const yyyy = nowVN.getFullYear();
+  const mm = String(nowVN.getMonth() + 1).padStart(2, '0');
+  const dd = String(nowVN.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function TiepNhanXePage() {
   const { currentUser, kiemTraQuyen } = useAuth();
   const [screenWidth, setScreenWidth] = useState(1200);
@@ -32,6 +40,7 @@ export default function TiepNhanXePage() {
   const [dsTrangThai, setDsTrangThai] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dangTraCuu, setDangTraCuu] = useState(false);
+  const [nguonKhachBadge, setNguonKhachBadge] = useState<{ text: string; bg: string; color: string } | null>(null);
 
   // Modal Sửa state
   const [modalEditOpen, setModalEditOpen] = useState(false);
@@ -59,7 +68,7 @@ export default function TiepNhanXePage() {
     so_dien_thoai: '',
     co_van_vien: '',
     hang_muc_thuc_hien: '',
-    trang_thai_hen: '24H',
+    trang_thai_hen: 'XVL',
     ghi_chu: '',
   });
 
@@ -109,7 +118,7 @@ export default function TiepNhanXePage() {
       } else {
         setDsTrangThai([
           { ma_trang_thai: '24H', ten_trang_thai: '24H' },
-          { ma_trang_thai: 'H', ten_trang_thai: 'H (Hẹn trước)' },
+          { ma_trang_thai: 'H', ten_trang_thai: 'H (Hẹn trong ngày)' },
           { ma_trang_thai: 'XVL', ten_trang_thai: 'XVL (Xe vãng lai)' },
         ]);
       }
@@ -129,31 +138,79 @@ export default function TiepNhanXePage() {
     loadInitData();
   }, []);
 
-  // 2. Tra cứu tự động từ danh sách Khách Hàng khi nhập biển số
+  // 2. Tra cứu 2 tầng: Tìm trong bảng Hẹn hôm nay trước -> Không có mới nhảy sang bảng Khách hàng tổng
   async function handleBienSoBlur() {
     const bsNhap = form.bien_so.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    if (!bsNhap) return;
+    if (!bsNhap) {
+      setNguonKhachBadge(null);
+      return;
+    }
 
     setDangTraCuu(true);
     try {
-      const { data, error } = await supabase
-        .from('dich_vu_khach_hang')
-        .select('*')
-        .ilike('bien_so', `%${bsNhap}%`)
+      const homNay = getHomNayVN();
+
+      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen của ngày hôm nay
+      const { data: khachHen, error: errHen } = await supabase
+        .from('dich_vu_khach_hang_hen')
+        .select('bien_so, ten_khach_hang, so_dien_thoai, trang_thai_hen')
+        .eq('ngay_hen', homNay)
+        .eq('bien_so', bsNhap)
         .maybeSingle();
 
-      if (error) throw error;
+      if (errHen) throw errHen;
 
-      if (data) {
+      if (khachHen) {
+        const loaiHen = khachHen.trang_thai_hen || '24H';
         setForm((prev) => ({
           ...prev,
-          bien_so: data.bien_so || prev.bien_so,
-          ten_khach_hang: data.ten_khach_hang || prev.ten_khach_hang,
-          so_dien_thoai: data.so_dien_thoai || prev.so_dien_thoai,
-          hang_muc_thuc_hien: data.hang_muc_du_kien || prev.hang_muc_thuc_hien,
-          trang_thai_hen: data.trang_thai_hen || prev.trang_thai_hen,
-          co_van_vien: data.co_van || prev.co_van_vien,
+          bien_so: khachHen.bien_so,
+          ten_khach_hang: khachHen.ten_khach_hang || prev.ten_khach_hang,
+          so_dien_thoai: khachHen.so_dien_thoai || prev.so_dien_thoai,
+          trang_thai_hen: loaiHen,
         }));
+        setNguonKhachBadge({
+          text: loaiHen === '24H' ? '📅 Khách đặt hẹn 24H hôm nay' : '⏰ Khách đặt hẹn H trong ngày',
+          bg: '#dcfce7',
+          color: '#15803d',
+        });
+        return;
+      }
+
+      // TẦNG 2: Không có trong bảng hẹn -> Nhảy sang bảng dich_vu_khach_hang tổng -> Gán trạng thái XVL
+      const { data: khachTong, error: errTong } = await supabase
+        .from('dich_vu_khach_hang')
+        .select('bien_so, ten_khach_hang, so_dien_thoai')
+        .eq('bien_so', bsNhap)
+        .maybeSingle();
+
+      if (errTong) throw errTong;
+
+      if (khachTong) {
+        setForm((prev) => ({
+          ...prev,
+          bien_so: khachTong.bien_so,
+          ten_khach_hang: khachTong.ten_khach_hang || prev.ten_khach_hang,
+          so_dien_thoai: khachTong.so_dien_thoai || prev.so_dien_thoai,
+          trang_thai_hen: 'XVL',
+        }));
+        setNguonKhachBadge({
+          text: '🚗 Khách hàng hệ thống (Không hẹn - XVL)',
+          bg: '#e0f2fe',
+          color: '#0369a1',
+        });
+      } else {
+        // Không có ở cả 2 bảng -> Khách mới (XVL)
+        setForm((prev) => ({
+          ...prev,
+          bien_so: bsNhap,
+          trang_thai_hen: 'XVL',
+        }));
+        setNguonKhachBadge({
+          text: '🆕 Xe mới chưa có dữ liệu (XVL)',
+          bg: '#fef3c7',
+          color: '#b45309',
+        });
       }
     } catch (err: any) {
       console.error('Lỗi tra cứu khách hàng:', err);
@@ -170,7 +227,7 @@ export default function TiepNhanXePage() {
       return;
     }
 
-    const bs = form.bien_so.trim().toUpperCase();
+    const bs = form.bien_so.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (!bs || !form.ten_khach_hang.trim() || !form.co_van_vien) {
       alert('Vui lòng điền đủ: Biển số, Tên khách hàng và Cố vấn viên!');
       return;
@@ -184,27 +241,24 @@ export default function TiepNhanXePage() {
         so_dien_thoai: form.so_dien_thoai.trim() || null,
         co_van_vien: form.co_van_vien,
         hang_muc_thuc_hien: form.hang_muc_thuc_hien || null,
-        trang_thai_hen: form.trang_thai_hen || '24H',
+        trang_thai_hen: form.trang_thai_hen || 'XVL',
         ghi_chu: form.ghi_chu.trim() || null,
         thoi_gian: new Date().toISOString(),
       };
 
-      // 1. Lưu vào bảng tiếp nhận
+      // 1. Lưu vào bảng nhật ký tiếp nhận
       const { error: insertErr } = await supabase
         .from('dich_vu_tiep_nhan')
         .insert([payload]);
 
       if (insertErr) throw insertErr;
 
-      // 2. Cập nhật sang bảng khách hàng
+      // 2. Đồng bộ thông tin cơ bản sang bảng khách hàng tổng (đã lược bỏ các cột thừa)
       await supabase.from('dich_vu_khach_hang').upsert(
         {
           bien_so: bs,
           ten_khach_hang: form.ten_khach_hang.trim(),
           so_dien_thoai: form.so_dien_thoai.trim() || null,
-          hang_muc_du_kien: form.hang_muc_thuc_hien || null,
-          trang_thai_hen: form.trang_thai_hen || '24H',
-          co_van: form.co_van_vien,
         },
         { onConflict: 'bien_so' }
       );
@@ -232,9 +286,10 @@ export default function TiepNhanXePage() {
         so_dien_thoai: '',
         co_van_vien: '',
         hang_muc_thuc_hien: '',
-        trang_thai_hen: '24H',
+        trang_thai_hen: 'XVL',
         ghi_chu: '',
       });
+      setNguonKhachBadge(null);
 
       alert(`✅ Đã lưu tiếp nhận xe ${bs} và gửi thông báo Zalo Bot thành công!`);
       loadInitData();
@@ -301,14 +356,12 @@ export default function TiepNhanXePage() {
 
       if (error) throw error;
 
+      // Cập nhật lại tên & SĐT bên kho khách hàng tổng
       await supabase
         .from('dich_vu_khach_hang')
         .update({
           ten_khach_hang: editRow.ten_khach_hang,
           so_dien_thoai: editRow.so_dien_thoai,
-          co_van: editRow.co_van_vien,
-          hang_muc_du_kien: editRow.hang_muc_thuc_hien,
-          trang_thai_hen: editRow.trang_thai_hen,
         })
         .eq('bien_so', editRow.bien_so);
 
@@ -439,7 +492,10 @@ export default function TiepNhanXePage() {
               type="text"
               placeholder="VD: 93A46410"
               value={form.bien_so}
-              onChange={(e) => setForm({ ...form, bien_so: e.target.value.toUpperCase() })}
+              onChange={(e) => {
+                setForm({ ...form, bien_so: e.target.value.toUpperCase() });
+                if (nguonKhachBadge) setNguonKhachBadge(null);
+              }}
               onBlur={handleBienSoBlur}
               required
               style={{
@@ -450,6 +506,22 @@ export default function TiepNhanXePage() {
                 color: '#0284c7',
               }}
             />
+
+            {nguonKhachBadge && (
+              <div
+                style={{
+                  marginTop: '6px',
+                  padding: '4px 9px',
+                  borderRadius: '5px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  backgroundColor: nguonKhachBadge.bg,
+                  color: nguonKhachBadge.color,
+                }}
+              >
+                {nguonKhachBadge.text}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1.2fr 1fr', gap: '10px' }}>
@@ -542,17 +614,18 @@ export default function TiepNhanXePage() {
           <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setForm({
                   bien_so: '',
                   ten_khach_hang: '',
                   so_dien_thoai: '',
                   co_van_vien: '',
                   hang_muc_thuc_hien: '',
-                  trang_thai_hen: '24H',
+                  trang_thai_hen: 'XVL',
                   ghi_chu: '',
-                })
-              }
+                });
+                setNguonKhachBadge(null);
+              }}
               style={{
                 flex: 1,
                 padding: isSmallMobile ? '11px' : '10px',
@@ -659,7 +732,6 @@ export default function TiepNhanXePage() {
                     backgroundColor: '#fff',
                   }}
                 >
-                  {/* Hàng 1: NO + Biển số + Nhãn Hẹn & Hạng mục */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
@@ -675,30 +747,26 @@ export default function TiepNhanXePage() {
                         {row.hang_muc_thuc_hien || row.hang_muc || '---'}
                       </span>
                       <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>
-                        {row.trang_thai_hen || '24H'}
+                        {row.trang_thai_hen || 'XVL'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Hàng 2: Khách hàng + SĐT */}
                   <div style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a', marginBottom: '4px' }}>
                     👤 {row.ten_khach_hang}
                     {row.so_dien_thoai ? <span style={{ fontWeight: 'normal', color: '#475569' }}> • {row.so_dien_thoai}</span> : ''}
                   </div>
 
-                  {/* Hàng 3: Cố vấn viên */}
                   <div style={{ fontSize: '12px', color: '#334155', marginBottom: '4px' }}>
                     🧑‍💼 CVDV: <strong>{row.co_van_vien || row.ten_co_van || '---'}</strong>
                   </div>
 
-                  {/* Hàng 4: Ghi chú (nếu có) */}
                   {row.ghi_chu && (
                     <div style={{ fontSize: '12px', color: '#475569', backgroundColor: '#f8fafc', padding: '4px 8px', borderRadius: '4px', marginBottom: '6px' }}>
                       📝 {row.ghi_chu}
                     </div>
                   )}
 
-                  {/* Hàng 5: Thời gian + Thao tác */}
                   <div
                     style={{
                       display: 'flex',
@@ -812,7 +880,7 @@ export default function TiepNhanXePage() {
                       </td>
                       <td style={{ padding: '10px', textAlign: 'center' }}>
                         <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: '#e2e8f0', fontSize: '11px', fontWeight: 'bold' }}>
-                          {row.trang_thai_hen || '24H'}
+                          {row.trang_thai_hen || 'XVL'}
                         </span>
                       </td>
                       <td style={{ padding: '10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -988,7 +1056,7 @@ export default function TiepNhanXePage() {
                 <div>
                   <label style={labelStyle}>Trạng thái hẹn</label>
                   <select
-                    value={editRow.trang_thai_hen || '24H'}
+                    value={editRow.trang_thai_hen || 'XVL'}
                     onChange={(e) => setEditRow({ ...editRow, trang_thai_hen: e.target.value })}
                     style={responsiveInputStyle}
                   >
