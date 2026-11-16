@@ -141,6 +141,56 @@ export function AuthProvider({ children }) {
     return false;
   }
 
+  useEffect(() => {
+  if (!user?.id) return;
+
+  // 1. Kiểm tra ngay khi nhân viên vừa tải lại trang (F5)
+  const checkSession = async () => {
+    const { data } = await supabase
+      .from('nhan_su')
+      .select('session_version, trang_thai')
+      .eq('id', user.id)
+      .single();
+
+    if (
+      data &&
+      (data.session_version !== user.session_version || data.trang_thai === 'Khóa')
+    ) {
+      alert('Thông tin tài khoản vừa được Admin cập nhật. Vui lòng đăng nhập lại!');
+      logout(); // Hàm xóa localStorage và router.push('/login') của bạn
+    }
+  };
+  checkSession();
+
+  // 2. Lắng nghe Realtime: Đá văng ngay lập tức khi Admin vừa bấm Lưu
+  const channel = supabase
+    .channel(`force-logout-${user.id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'nhan_su',
+        filter: `id=eq.${user.id}`,
+      },
+      (payload) => {
+        const updated = payload.new;
+        if (
+          updated.session_version !== user.session_version ||
+          updated.trang_thai === 'Khóa'
+        ) {
+          alert('Mật khẩu của bạn vừa được Admin thay đổi. Vui lòng đăng nhập lại!');
+          logout();
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user]);
+
   return (
     <AuthContext.Provider value={{ currentUser, loadingUser, dangNhap, dangXuat, kiemTraQuyen }}>
       {children}
