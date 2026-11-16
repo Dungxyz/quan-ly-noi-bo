@@ -26,20 +26,29 @@ function getThongTinThoiGianVN() {
   const gio = vnTime.getUTCHours();
   const phut = vnTime.getUTCMinutes();
 
-  const formatUTCDate = (d: Date) => {
+  // Định dạng chuẩn YYYY-MM-DD để lưu & truy vấn cột DATE trên Supabase
+  const formatDBDate = (d: Date) => {
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Định dạng DD/MM/YYYY để hiển thị trên giao diện
+  const formatDisplayDate = (d: Date) => {
     const yyyy = d.getUTCFullYear();
     const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(d.getUTCDate()).padStart(2, '0');
     return `${dd}/${mm}/${yyyy}`;
   };
 
-  const homNayStr = formatUTCDate(vnTime);
   const ngayMai = new Date(vnTime.getTime() + 24 * 60 * 60 * 1000);
-  const ngayMaiStr = formatUTCDate(ngayMai);
 
   return {
-    homNayStr,
-    ngayMaiStr,
+    homNayStr: formatDBDate(vnTime),
+    ngayMaiStr: formatDBDate(ngayMai),
+    homNayDisplay: formatDisplayDate(vnTime),
+    ngayMaiDisplay: formatDisplayDate(ngayMai),
     daKhoa23h: gio >= 23,
     gioHienTai: `${String(gio).padStart(2, '0')}:${String(phut).padStart(2, '0')}`,
   };
@@ -50,18 +59,6 @@ function chuanHoaBienSo(bs: string) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
     .trim();
-}
-
-// Hàm lấy giá trị cột linh hoạt (bỏ qua xuống dòng, khoảng trắng thừa, hoa/thường trong header Excel)
-function layGiaTriCot(row: Record<string, any>, danhSachTenCot: string[]): string {
-  const entries = Object.entries(row);
-  for (const [key, val] of entries) {
-    const keyChuan = key.replace(/\s+/g, ' ').trim().toLowerCase();
-    if (danhSachTenCot.includes(keyChuan)) {
-      return String(val ?? '').trim();
-    }
-  }
-  return '';
 }
 
 export default function KhachHangHenPage() {
@@ -84,6 +81,8 @@ export default function KhachHangHenPage() {
   const [thoiGian, setThoiGian] = useState({
     homNayStr: '',
     ngayMaiStr: '',
+    homNayDisplay: '',
+    ngayMaiDisplay: '',
     daKhoa23h: false,
     gioHienTai: '',
   });
@@ -199,7 +198,7 @@ export default function KhachHangHenPage() {
     return () => clearTimeout(timer);
   }, [tuKhoa, activeTab]);
 
-  // 2. Tải file Excel mẫu ĐÚNG 6 CỘT khớp thứ tự bảng gốc để copy-paste không bị lệch
+  // 2. Tải file Excel mẫu ĐÚNG 6 CỘT khớp thứ tự bảng gốc
   function handleTaiFileMau() {
     const tg = getThongTinThoiGianVN();
     const mauData = [
@@ -226,7 +225,7 @@ export default function KhachHangHenPage() {
     XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`);
   }
 
-  // 3. Import Excel Khách hẹn 24H (Tự động bắt đúng Biển số, Tên KH, SĐT dù dán 3 cột hay 6 cột)
+  // 3. Import Excel Khách hẹn 24H
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -245,7 +244,6 @@ export default function KhachHangHenPage() {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
-      // Đọc theo dạng mảng 2 chiều (mỗi dòng là 1 mảng các ô [A, B, C, D, E, F...]) để không bao giờ sợ lệch tiêu đề
       const matrix: any[][] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
         header: 1,
         defval: '',
@@ -265,7 +263,6 @@ export default function KhachHangHenPage() {
         const rawBienSo = String(cells[0] ?? '').trim();
         const rawTen = String(cells[1] ?? '').trim();
 
-        // Bỏ qua dòng tiêu đề ("Biển số", "Khách hàng"...)
         if (!rawBienSo || rawBienSo.toLowerCase().includes('biển số') || rawBienSo.toLowerCase() === 'bien_so') {
           continue;
         }
@@ -273,11 +270,9 @@ export default function KhachHangHenPage() {
         const bs = chuanHoaBienSo(rawBienSo);
         if (!bs || !rawTen) continue;
 
-        // Tự động tìm ô chứa Số điện thoại trong các cột còn lại (cột C, D, E, F...)
         let sdt = '';
         for (let i = 2; i < cells.length; i++) {
           const val = String(cells[i] ?? '').replace(/[\s.-]/g, '').trim();
-          // Nhận diện chuỗi số điện thoại VN (9 đến 11 chữ số)
           if (/^\d{9,11}$/.test(val)) {
             sdt = /^[35789]\d{8}$/.test(val) ? '0' + val : val;
             break;
@@ -314,7 +309,7 @@ export default function KhachHangHenPage() {
         .from('dich_vu_khach_hang')
         .upsert(Array.from(mapKhachTong.values()), { onConflict: 'bien_so' });
 
-      alert(`✅ Đã import thành công ${danhSachImport.length} khách hẹn 24H cho ngày mai (${tgCheck.ngayMaiStr})!`);
+      alert(`✅ Đã import thành công ${danhSachImport.length} khách hẹn 24H cho ngày mai (${tgCheck.ngayMaiDisplay})!`);
       loadDuLieu();
     } catch (err: any) {
       alert('Lỗi import file Excel: ' + (err.message || JSON.stringify(err)));
@@ -518,10 +513,10 @@ export default function KhachHangHenPage() {
           }}
         >
           <button type="button" onClick={() => setActiveTab('24H')} style={tabButtonStyle(activeTab === '24H')}>
-            📅 Khách hẹn 24H {thoiGian.ngayMaiStr ? `(Ngày mai: ${thoiGian.ngayMaiStr})` : ''}
+            📅 Khách hẹn 24H {thoiGian.ngayMaiDisplay ? `(Ngày mai: ${thoiGian.ngayMaiDisplay})` : ''}
           </button>
           <button type="button" onClick={() => setActiveTab('H')} style={tabButtonStyle(activeTab === 'H')}>
-            ⏰ Khách hẹn H {thoiGian.homNayStr ? `(Trong ngày: ${thoiGian.homNayStr})` : ''}
+            ⏰ Khách hẹn H {thoiGian.homNayDisplay ? `(Trong ngày: ${thoiGian.homNayDisplay})` : ''}
           </button>
           <button type="button" onClick={() => setActiveTab('TONG')} style={tabButtonStyle(activeTab === 'TONG')}>
             🚗 Danh sách khách hàng
@@ -529,7 +524,7 @@ export default function KhachHangHenPage() {
         </div>
 
         {/* THÔNG BÁO KHÓA SỔ 23H00 CHO TAB 24H */}
-        {activeTab === '24H' && thoiGian.ngayMaiStr && (
+        {activeTab === '24H' && thoiGian.ngayMaiDisplay && (
           <div
             style={{
               padding: '10px 14px',
@@ -542,8 +537,8 @@ export default function KhachHangHenPage() {
             }}
           >
             {thoiGian.daKhoa23h
-              ? `🔒 Đã quá 23:00 (Hiện tại ${thoiGian.gioHienTai}) — Hệ thống đã khóa import file khách hẹn 24H cho ngày ${thoiGian.ngayMaiStr}.`
-              : `🟢 Đang mở import file Excel khách hẹn 24H cho ngày mai (${thoiGian.ngayMaiStr}). Tự động khóa lúc 23:00 (Hiện tại: ${thoiGian.gioHienTai}).`}
+              ? `🔒 Đã quá 23:00 (Hiện tại ${thoiGian.gioHienTai}) — Hệ thống đã khóa import file khách hẹn 24H cho ngày ${thoiGian.ngayMaiDisplay}.`
+              : `🟢 Đang mở import file Excel khách hẹn 24H cho ngày mai (${thoiGian.ngayMaiDisplay}). Tự động khóa lúc 23:00 (Hiện tại: ${thoiGian.gioHienTai}).`}
           </div>
         )}
 

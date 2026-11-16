@@ -12,6 +12,13 @@ function getHomNayVN(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function formatNgayVN(isoDate: string): string {
+  if (!isoDate) return '';
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return isoDate;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
 export default function TiepNhanXePage() {
   const { currentUser, kiemTraQuyen } = useAuth();
   const [screenWidth, setScreenWidth] = useState(1200);
@@ -164,6 +171,7 @@ export default function TiepNhanXePage() {
 
       if (khachHen) {
         const loaiHen = khachHen.trang_thai_hen || '24H';
+        const ngayHienThi = formatNgayVN(khachHen.ngay_hen);
         setForm((prev) => ({
           ...prev,
           bien_so: khachHen.bien_so,
@@ -174,8 +182,8 @@ export default function TiepNhanXePage() {
         setNguonKhachBadge({
           text:
             loaiHen === '24H'
-              ? `📅 Khách hàng hệ thống - 24H (${khachHen.ngay_hen})`
-              : `⏰ Khách hàng hệ thống - H (${khachHen.ngay_hen})`,
+              ? `📅 Khách hàng hệ thống - 24H (${ngayHienThi})`
+              : `⏰ Khách hàng hệ thống - H (${ngayHienThi})`,
           bg: '#dcfce7',
           color: '#15803d',
         });
