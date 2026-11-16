@@ -13,6 +13,7 @@ interface KhachHangHenItem {
   so_dien_thoai: string;
   hang_muc_du_kien?: string;
   co_van?: string;
+  ghi_chu?: string;
   trang_thai_hen: '24H' | 'H';
 }
 
@@ -87,18 +88,16 @@ export default function KhachHangHenPage() {
     gioHienTai: '',
   });
 
-  // Hàm tự động xóa khách hẹn H sau 23:00 (và các lịch H của ngày cũ)
+  // Tự động xóa khách hẹn H sau 23:00 (và các lịch H của ngày cũ)
   async function donDepHenHQua23h(tg = getThongTinThoiGianVN()) {
     try {
       if (tg.daKhoa23h) {
-        // Từ 23:00 trở đi: xóa toàn bộ khách hẹn H từ hôm nay trở về trước
         await supabase
           .from('dich_vu_khach_hang_hen')
           .delete()
           .eq('trang_thai_hen', 'H')
           .lte('ngay_hen', tg.homNayStr);
       } else {
-        // Trước 23:00: xóa các lịch hẹn H tồn đọng từ hôm qua trở về trước
         await supabase
           .from('dich_vu_khach_hang_hen')
           .delete()
@@ -150,6 +149,7 @@ export default function KhachHangHenPage() {
     so_dien_thoai: '',
     hang_muc_du_kien: 'BDĐK',
     co_van: '',
+    ghi_chu: '',
     trang_thai_hen: 'H' as '24H' | 'H',
   });
 
@@ -216,19 +216,18 @@ export default function KhachHangHenPage() {
     const k = searchKeyword.trim();
 
     try {
-      // Tự động dọn dẹp danh sách H nếu đã qua 23h00
       await donDepHenHQua23h(tg);
 
       if (activeTab === '24H') {
         let query = supabase
           .from('dich_vu_khach_hang_hen')
-          .select('id, ngay_hen, bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, trang_thai_hen')
+          .select('id, ngay_hen, bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, ghi_chu, trang_thai_hen')
           .eq('ngay_hen', tg.ngayMaiStr)
           .eq('trang_thai_hen', '24H')
           .order('id', { ascending: false });
 
         if (k) {
-          query = query.or(`bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%`);
+          query = query.or(`bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%,ghi_chu.ilike.%${k}%`);
         }
         const { data, error } = await query;
         if (error) throw error;
@@ -241,13 +240,13 @@ export default function KhachHangHenPage() {
 
         let query = supabase
           .from('dich_vu_khach_hang_hen')
-          .select('id, ngay_hen, bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, trang_thai_hen')
+          .select('id, ngay_hen, bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, ghi_chu, trang_thai_hen')
           .eq('ngay_hen', tg.homNayStr)
           .eq('trang_thai_hen', 'H')
           .order('id', { ascending: false });
 
         if (k) {
-          query = query.or(`bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%`);
+          query = query.or(`bien_so.ilike.%${k}%,ten_khach_hang.ilike.%${k}%,so_dien_thoai.ilike.%${k}%,co_van.ilike.%${k}%,ghi_chu.ilike.%${k}%`);
         }
         const { data, error } = await query;
         if (error) throw error;
@@ -287,7 +286,7 @@ export default function KhachHangHenPage() {
     return () => clearTimeout(timer);
   }, [tuKhoa, activeTab]);
 
-  // 2. Tải file Excel mẫu ĐÚNG 6 CỘT
+  // 2. Tải file Excel mẫu ĐÚNG 7 CỘT (có thêm cột Ghi chú ở cuối)
   function handleTaiFileMau() {
     const tg = getThongTinThoiGianVN();
     const mauData = [
@@ -298,6 +297,7 @@ export default function KhachHangHenPage() {
         'Trạng thái hẹn': '24H',
         'Số điện thoại': '0974737864',
         'Cố vấn viên': 'FNV-070 Lê Phạm Anh Tuấn',
+        'Ghi chú': 'Khách hẹn 8h30 sáng, rửa xe kỹ',
       },
       {
         'Biển số': '60K96532',
@@ -306,6 +306,7 @@ export default function KhachHangHenPage() {
         'Trạng thái hẹn': '24H',
         'Số điện thoại': '0867733105',
         'Cố vấn viên': 'FNV-070 Lê Phạm Anh Tuấn',
+        'Ghi chú': '',
       },
     ];
     const ws = XLSX.utils.json_to_sheet(mauData);
@@ -314,7 +315,7 @@ export default function KhachHangHenPage() {
     XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`);
   }
 
-  // 3. Import Excel Khách hẹn 24H: XÓA DANH SÁCH 24H CŨ TRƯỚC KHI NẠP DANH SÁCH MỚI
+  // 3. Import Excel Khách hẹn 24H: XÓA DANH SÁCH 24H CŨ TRƯỚC KHI NẠP DANH SÁCH MỚI (đọc cả cột Ghi chú)
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -362,6 +363,7 @@ export default function KhachHangHenPage() {
         let hangMuc = '';
         let sdt = '';
         let coVan = '';
+        let ghiChu = '';
 
         for (let i = 2; i < cells.length; i++) {
           const rawCell = String(cells[i] ?? '').replace(/\s+/g, ' ').trim();
@@ -376,6 +378,8 @@ export default function KhachHangHenPage() {
             coVan = rawCell;
           } else if (!hangMuc && i === 2) {
             hangMuc = rawCell;
+          } else if (!ghiChu) {
+            ghiChu = rawCell;
           }
         }
 
@@ -386,6 +390,7 @@ export default function KhachHangHenPage() {
           so_dien_thoai: sdt,
           hang_muc_du_kien: hangMuc || undefined,
           co_van: coVan || undefined,
+          ghi_chu: ghiChu || undefined,
           trang_thai_hen: '24H',
         });
 
@@ -402,7 +407,7 @@ export default function KhachHangHenPage() {
         return;
       }
 
-      // 1. Xóa toàn bộ danh sách khách hẹn 24H cũ trước khi import danh sách mới
+      // 1. Xóa toàn bộ danh sách khách hẹn 24H cũ
       const { error: errXoaCu } = await supabase
         .from('dich_vu_khach_hang_hen')
         .delete()
@@ -466,6 +471,7 @@ export default function KhachHangHenPage() {
       so_dien_thoai: '',
       hang_muc_du_kien: dsHangMuc[0]?.ma_hang_muc || 'BDĐK',
       co_van: '',
+      ghi_chu: '',
       trang_thai_hen: 'H',
     });
     setModalOpen(true);
@@ -482,6 +488,7 @@ export default function KhachHangHenPage() {
       so_dien_thoai: item.so_dien_thoai || '',
       hang_muc_du_kien: item.hang_muc_du_kien || 'BDĐK',
       co_van: item.co_van || '',
+      ghi_chu: item.ghi_chu || '',
       trang_thai_hen: item.trang_thai_hen,
     });
     setModalOpen(true);
@@ -498,6 +505,7 @@ export default function KhachHangHenPage() {
       so_dien_thoai: item.so_dien_thoai || '',
       hang_muc_du_kien: 'BDĐK',
       co_van: '',
+      ghi_chu: '',
       trang_thai_hen: 'H',
     });
     setModalOpen(true);
@@ -537,6 +545,7 @@ export default function KhachHangHenPage() {
           so_dien_thoai: sdtChuan || null,
           hang_muc_du_kien: formData.hang_muc_du_kien || null,
           co_van: formData.co_van || null,
+          ghi_chu: formData.ghi_chu.trim() || null,
           trang_thai_hen: isEditing ? formData.trang_thai_hen : 'H',
         };
 
@@ -730,7 +739,7 @@ export default function KhachHangHenPage() {
           >
             <input
               type="text"
-              placeholder="🔍 Tìm biển số, tên, SĐT, cố vấn..."
+              placeholder="🔍 Tìm biển số, tên, SĐT, ghi chú..."
               value={tuKhoa}
               onChange={(e) => setTuKhoa(e.target.value)}
               style={{
@@ -860,6 +869,7 @@ export default function KhachHangHenPage() {
                       <th style={{ padding: '12px 14px' }}>TRẠNG THÁI</th>
                       <th style={{ padding: '12px 14px' }}>SỐ ĐIỆN THOẠI</th>
                       <th style={{ padding: '12px 14px' }}>CỐ VẤN</th>
+                      <th style={{ padding: '12px 14px' }}>GHI CHÚ</th>
                       <th style={{ padding: '12px 14px', textAlign: 'center' }}>HÀNH ĐỘNG</th>
                     </tr>
                   </thead>
@@ -904,6 +914,7 @@ export default function KhachHangHenPage() {
                         </td>
                         <td style={{ padding: '12px 14px', color: '#475569' }}>{kh.so_dien_thoai || '---'}</td>
                         <td style={{ padding: '12px 14px', color: '#334155', fontWeight: '500' }}>{kh.co_van || '---'}</td>
+                        <td style={{ padding: '12px 14px', color: '#475569', maxWidth: '220px' }}>{kh.ghi_chu || '---'}</td>
                         <td style={{ padding: '12px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '6px' }}>
                             {canEdit && (
@@ -1112,39 +1123,52 @@ export default function KhachHangHenPage() {
               </div>
 
               {!(activeTab === 'TONG' && isEditing) && (
-                <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1.2fr', gap: '10px', marginBottom: '18px' }}>
-                  <div>
-                    <label style={labelStyle}>Hạng mục dự kiến</label>
-                    <select
-                      value={formData.hang_muc_du_kien}
-                      onChange={(e) => setFormData({ ...formData, hang_muc_du_kien: e.target.value })}
-                      style={responsiveInputStyle}
-                    >
-                      <option value="">-- Chọn hạng mục --</option>
-                      {dsHangMuc.map((item, idx) => (
-                        <option key={item.id || item.ma_hang_muc || idx} value={item.ma_hang_muc}>
-                          {item.ma_hang_muc}
-                        </option>
-                      ))}
-                    </select>
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1.2fr', gap: '10px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={labelStyle}>Hạng mục dự kiến</label>
+                      <select
+                        value={formData.hang_muc_du_kien}
+                        onChange={(e) => setFormData({ ...formData, hang_muc_du_kien: e.target.value })}
+                        style={responsiveInputStyle}
+                      >
+                        <option value="">-- Chọn hạng mục --</option>
+                        {dsHangMuc.map((item, idx) => (
+                          <option key={item.id || item.ma_hang_muc || idx} value={item.ma_hang_muc}>
+                            {item.ma_hang_muc}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Cố vấn viên (CVDV)</label>
+                      <select
+                        value={formData.co_van}
+                        onChange={(e) => setFormData({ ...formData, co_van: e.target.value })}
+                        style={responsiveInputStyle}
+                      >
+                        <option value="">-- Chưa chỉ định --</option>
+                        {danhSachCoVan.map((nv) => (
+                          <option key={nv.ma_nv} value={`${nv.ma_nv} ${nv.ho_ten}`}>
+                            {nv.ma_nv} - {nv.ho_ten}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div>
-                    <label style={labelStyle}>Cố vấn viên (CVDV)</label>
-                    <select
-                      value={formData.co_van}
-                      onChange={(e) => setFormData({ ...formData, co_van: e.target.value })}
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={labelStyle}>Ghi chú</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Hẹn 9h00, khách đợi lấy ngay..."
+                      value={formData.ghi_chu}
+                      onChange={(e) => setFormData({ ...formData, ghi_chu: e.target.value })}
                       style={responsiveInputStyle}
-                    >
-                      <option value="">-- Chưa chỉ định --</option>
-                      {danhSachCoVan.map((nv) => (
-                        <option key={nv.ma_nv} value={`${nv.ma_nv} ${nv.ho_ten}`}>
-                          {nv.ma_nv} - {nv.ho_ten}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
-                </div>
+                </>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
