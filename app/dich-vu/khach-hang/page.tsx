@@ -87,10 +87,41 @@ export default function KhachHangHenPage() {
     gioHienTai: '',
   });
 
+  // Hàm tự động xóa khách hẹn H sau 23:00 (và các lịch H của ngày cũ)
+  async function donDepHenHQua23h(tg = getThongTinThoiGianVN()) {
+    try {
+      if (tg.daKhoa23h) {
+        // Từ 23:00 trở đi: xóa toàn bộ khách hẹn H từ hôm nay trở về trước
+        await supabase
+          .from('dich_vu_khach_hang_hen')
+          .delete()
+          .eq('trang_thai_hen', 'H')
+          .lte('ngay_hen', tg.homNayStr);
+      } else {
+        // Trước 23:00: xóa các lịch hẹn H tồn đọng từ hôm qua trở về trước
+        await supabase
+          .from('dich_vu_khach_hang_hen')
+          .delete()
+          .eq('trang_thai_hen', 'H')
+          .lt('ngay_hen', tg.homNayStr);
+      }
+    } catch (err) {
+      console.error('Lỗi dọn dẹp hẹn H:', err);
+    }
+  }
+
   useEffect(() => {
-    setThoiGian(getThongTinThoiGianVN());
-    const timer = setInterval(() => {
-      setThoiGian(getThongTinThoiGianVN());
+    const tgInit = getThongTinThoiGianVN();
+    setThoiGian(tgInit);
+    donDepHenHQua23h(tgInit);
+
+    const timer = setInterval(async () => {
+      const tgNow = getThongTinThoiGianVN();
+      setThoiGian(tgNow);
+      if (tgNow.daKhoa23h) {
+        await donDepHenHQua23h(tgNow);
+        setDsHenH([]);
+      }
     }, 30000);
     return () => clearInterval(timer);
   }, []);
@@ -100,7 +131,6 @@ export default function KhachHangHenPage() {
   const [dsKhachTong, setDsKhachTong] = useState<KhachHangTongItem[]>([]);
   const [tongSoKhach, setTongSoKhach] = useState(0);
 
-  // Danh mục Hạng mục & Cố vấn
   const [danhSachCoVan, setDanhSachCoVan] = useState<any[]>([]);
   const [dsHangMuc, setDsHangMuc] = useState<any[]>([]);
 
@@ -133,7 +163,6 @@ export default function KhachHangHenPage() {
   const canDelete =
     isAdmin || role.includes('HEN_DELETE') || (typeof kiemTraQuyen === 'function' && kiemTraQuyen('HEN_DELETE'));
 
-  // Nạp danh mục Cố vấn & Hạng mục
   async function loadDanhMuc() {
     try {
       const { data: nvData } = await supabase
@@ -187,6 +216,9 @@ export default function KhachHangHenPage() {
     const k = searchKeyword.trim();
 
     try {
+      // Tự động dọn dẹp danh sách H nếu đã qua 23h00
+      await donDepHenHQua23h(tg);
+
       if (activeTab === '24H') {
         let query = supabase
           .from('dich_vu_khach_hang_hen')
@@ -202,6 +234,11 @@ export default function KhachHangHenPage() {
         if (error) throw error;
         setDsHen24H((data as KhachHangHenItem[]) || []);
       } else if (activeTab === 'H') {
+        if (tg.daKhoa23h) {
+          setDsHenH([]);
+          return;
+        }
+
         let query = supabase
           .from('dich_vu_khach_hang_hen')
           .select('id, ngay_hen, bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, trang_thai_hen')
@@ -277,7 +314,7 @@ export default function KhachHangHenPage() {
     XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`);
   }
 
-  // 3. Import Excel Khách hẹn 24H (Bắt luôn Hạng mục & Cố vấn viên từ bảng 6 cột)
+  // 3. Import Excel Khách hẹn 24H: XÓA DANH SÁCH 24H CŨ TRƯỚC KHI NẠP DANH SÁCH MỚI
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -365,16 +402,25 @@ export default function KhachHangHenPage() {
         return;
       }
 
+      // 1. Xóa toàn bộ danh sách khách hẹn 24H cũ trước khi import danh sách mới
+      const { error: errXoaCu } = await supabase
+        .from('dich_vu_khach_hang_hen')
+        .delete()
+        .eq('trang_thai_hen', '24H');
+      if (errXoaCu) throw errXoaCu;
+
+      // 2. Nạp danh sách 24H mới
       const { error: errHen } = await supabase
         .from('dich_vu_khach_hang_hen')
         .upsert(danhSachImport, { onConflict: 'ngay_hen,bien_so' });
       if (errHen) throw errHen;
 
+      // 3. Đồng bộ sang kho khách hàng tổng
       await supabase
         .from('dich_vu_khach_hang')
         .upsert(Array.from(mapKhachTong.values()), { onConflict: 'bien_so' });
 
-      alert(`✅ Đã import thành công ${danhSachImport.length} khách hẹn 24H cho ngày mai (${tgCheck.ngayMaiDisplay})!`);
+      alert(`✅ Đã thay thế danh sách cũ và import ${danhSachImport.length} khách hẹn 24H mới cho ngày mai (${tgCheck.ngayMaiDisplay})!`);
       loadDuLieu();
     } catch (err: any) {
       alert('Lỗi import file Excel: ' + (err.message || JSON.stringify(err)));
@@ -407,6 +453,10 @@ export default function KhachHangHenPage() {
   // 5. Mở modal thêm khách hẹn H (trong ngày)
   function handleOpenAddH() {
     const tg = getThongTinThoiGianVN();
+    if (tg.daKhoa23h) {
+      alert(`⛔ Đã qua 23:00 (${tg.gioHienTai}), danh sách hẹn H trong ngày đã tự động chốt và xóa!`);
+      return;
+    }
     setIsEditing(false);
     setFormData({
       id: undefined,
@@ -596,7 +646,7 @@ export default function KhachHangHenPage() {
           </button>
         </div>
 
-        {/* THÔNG BÁO KHÓA SỔ 23H00 CHO TAB 24H */}
+        {/* THÔNG BÁO TRẠNG THÁI 23H00 */}
         {activeTab === '24H' && thoiGian.ngayMaiDisplay && (
           <div
             style={{
@@ -611,7 +661,25 @@ export default function KhachHangHenPage() {
           >
             {thoiGian.daKhoa23h
               ? `🔒 Đã quá 23:00 (Hiện tại ${thoiGian.gioHienTai}) — Hệ thống đã khóa import file khách hẹn 24H cho ngày ${thoiGian.ngayMaiDisplay}.`
-              : `🟢 Đang mở import file Excel khách hẹn 24H cho ngày mai (${thoiGian.ngayMaiDisplay}). Tự động khóa lúc 23:00 (Hiện tại: ${thoiGian.gioHienTai}).`}
+              : `🟢 Đang mở import file Excel khách hẹn 24H cho ngày mai (${thoiGian.ngayMaiDisplay}). Import mới sẽ tự động xóa danh sách cũ. Khóa lúc 23:00.`}
+          </div>
+        )}
+
+        {activeTab === 'H' && thoiGian.homNayDisplay && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: '6px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              backgroundColor: thoiGian.daKhoa23h ? '#fef2f2' : '#f0f9ff',
+              border: `1px solid ${thoiGian.daKhoa23h ? '#fecaca' : '#bae6fd'}`,
+              color: thoiGian.daKhoa23h ? '#b91c1c' : '#0369a1',
+            }}
+          >
+            {thoiGian.daKhoa23h
+              ? `🧹 Đã qua 23:00 (Hiện tại ${thoiGian.gioHienTai}) — Danh sách khách hẹn H trong ngày đã được tự động xóa.`
+              : `⏰ Danh sách khách hẹn H trong ngày (${thoiGian.homNayDisplay}) sẽ tự động xóa sau 23:00 hằng ngày.`}
           </div>
         )}
 
@@ -728,7 +796,7 @@ export default function KhachHangHenPage() {
                 </>
               )}
 
-              {activeTab === 'H' && canAdd && (
+              {activeTab === 'H' && canAdd && !thoiGian.daKhoa23h && (
                 <button
                   type="button"
                   onClick={handleOpenAddH}
@@ -1043,7 +1111,6 @@ export default function KhachHangHenPage() {
                 </div>
               </div>
 
-              {/* Chỉ hiện Hạng mục & Cố vấn khi thêm/sửa lịch hẹn (không hiện khi sửa ở Tab Khách tổng) */}
               {!(activeTab === 'TONG' && isEditing) && (
                 <div style={{ display: 'grid', gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1.2fr', gap: '10px', marginBottom: '18px' }}>
                   <div>

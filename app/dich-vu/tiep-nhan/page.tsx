@@ -145,7 +145,7 @@ export default function TiepNhanXePage() {
     loadInitData();
   }, []);
 
-  // 2. Tra cứu 2 tầng: Tìm trong bảng Hẹn (hôm nay & ngày mai) trước -> Không có mới nhảy sang bảng Khách hàng tổng
+  // 2. Tra cứu 2 tầng: Tìm trong bảng Hẹn trước -> Không có mới nhảy sang bảng Khách hàng tổng
   async function handleBienSoBlur() {
     const bsNhap = form.bien_so.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (!bsNhap) {
@@ -155,9 +155,20 @@ export default function TiepNhanXePage() {
 
     setDangTraCuu(true);
     try {
+      const vnTime = new Date(Date.now() + 7 * 60 * 60 * 1000);
       const homNay = getHomNayVN();
+      const daQua23h = vnTime.getUTCHours() >= 23;
 
-      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen (từ hôm nay trở đi, ưu tiên ngày gần nhất)
+      // Dọn dẹp luôn lịch hẹn H đã hết hạn nếu qua 23h00
+      if (daQua23h) {
+        await supabase
+          .from('dich_vu_khach_hang_hen')
+          .delete()
+          .eq('trang_thai_hen', 'H')
+          .lte('ngay_hen', homNay);
+      }
+
+      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen (từ hôm nay trở đi)
       const { data: khachHen, error: errHen } = await supabase
         .from('dich_vu_khach_hang_hen')
         .select('bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, trang_thai_hen, ngay_hen')
