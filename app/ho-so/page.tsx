@@ -4,8 +4,16 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function HoSoCaNhanPage() {
-  const { currentUser } = useAuth();
+  const { currentUser, doiMatKhauCaNhan } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
+
+  // State cho form đổi mật khẩu
+  const [matKhauCu, setMatKhauCu] = useState('');
+  const [matKhauMoi, setMatKhauMoi] = useState('');
+  const [xacNhanMatKhau, setXacNhanMatKhau] = useState('');
+  const [hienMatKhau, setHienMatKhau] = useState(false);
+  const [dangLuu, setDangLuu] = useState(false);
+  const [thongBao, setThongBao] = useState<{ loai: 'ok' | 'loi'; noiDung: string } | null>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 640);
@@ -13,6 +21,32 @@ export default function HoSoCaNhanPage() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const handleDoiMatKhau = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setThongBao(null);
+
+    if (matKhauMoi !== xacNhanMatKhau) {
+      setThongBao({ loai: 'loi', noiDung: 'Xác nhận mật khẩu mới không trùng khớp!' });
+      return;
+    }
+
+    try {
+      setDangLuu(true);
+      await doiMatKhauCaNhan(matKhauCu, matKhauMoi);
+      setThongBao({
+        loai: 'ok',
+        noiDung: 'Đổi mật khẩu thành công! Các thiết bị khác (nếu có) đã được tự động đăng xuất.',
+      });
+      setMatKhauCu('');
+      setMatKhauMoi('');
+      setXacNhanMatKhau('');
+    } catch (err: any) {
+      setThongBao({ loai: 'loi', noiDung: err.message || 'Có lỗi xảy ra khi đổi mật khẩu!' });
+    } finally {
+      setDangLuu(false);
+    }
+  };
 
   if (!currentUser) {
     return (
@@ -40,6 +74,18 @@ export default function HoSoCaNhanPage() {
     : 'NV';
 
   const isLocked = currentUser.phan_quyen === 'LOCKED';
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    fontSize: '14px',
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+    boxSizing: 'border-box',
+    outline: 'none',
+  };
 
   return (
     <div
@@ -319,6 +365,169 @@ export default function HoSoCaNhanPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* KHỐI 3: ĐỔI MẬT KHẨU ĐĂNG NHẬP */}
+        <div
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: '12px',
+            padding: isMobile ? '18px 16px' : '24px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '8px',
+              borderBottom: '1px solid #f1f5f9',
+              paddingBottom: '12px',
+              marginBottom: '16px',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: '15px',
+                fontWeight: 'bold',
+                color: '#b45309',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              🔒 ĐỔI MẬT KHẨU ĐĂNG NHẬP HỆ THỐNG
+            </h2>
+
+            <label
+              style={{
+                fontSize: '12px',
+                color: '#475569',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={hienMatKhau}
+                onChange={(e) => setHienMatKhau(e.target.checked)}
+              />
+              Hiện mật khẩu
+            </label>
+          </div>
+
+          {thongBao && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                backgroundColor: thongBao.loai === 'ok' ? '#dcfce7' : '#fee2e2',
+                color: thongBao.loai === 'ok' ? '#15803d' : '#dc2626',
+                border: `1px solid ${thongBao.loai === 'ok' ? '#bbf7d0' : '#fecaca'}`,
+              }}
+            >
+              {thongBao.loai === 'ok' ? '✅ ' : '⚠️ '}
+              {thongBao.noiDung}
+            </div>
+          )}
+
+          <form onSubmit={handleDoiMatKhau}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+                gap: '14px',
+              }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                  Mật khẩu hiện tại *
+                </label>
+                <input
+                  type={hienMatKhau ? 'text' : 'password'}
+                  required
+                  value={matKhauCu}
+                  onChange={(e) => setMatKhauCu(e.target.value)}
+                  placeholder="Nhập mật khẩu đang dùng..."
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                  Mật khẩu mới (tối thiểu 6 ký tự) *
+                </label>
+                <input
+                  type={hienMatKhau ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={matKhauMoi}
+                  onChange={(e) => setMatKhauMoi(e.target.value)}
+                  placeholder="Nhập mật khẩu mới..."
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                  Xác nhận mật khẩu mới *
+                </label>
+                <input
+                  type={hienMatKhau ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={xacNhanMatKhau}
+                  onChange={(e) => setXacNhanMatKhau(e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới..."
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: '16px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <span style={{ fontSize: '12px', color: '#64748b' }}>
+                ℹ️ Trường hợp quên mật khẩu hiện tại, vui lòng liên hệ <strong style={{ color: '#0f172a' }}>Bộ phận IT</strong> để được cấp lại.
+              </span>
+
+              <button
+                type="submit"
+                disabled={dangLuu}
+                style={{
+                  backgroundColor: '#0284c7',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  cursor: dangLuu ? 'not-allowed' : 'pointer',
+                  opacity: dangLuu ? 0.7 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {dangLuu ? 'Đang lưu...' : '💾 Cập nhật mật khẩu'}
+              </button>
+            </div>
+          </form>
         </div>
 
       </div>

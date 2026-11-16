@@ -166,6 +166,63 @@ export function AuthProvider({ children }) {
     return userClean;
   }
 
+  // Hàm nhân viên tự đổi mật khẩu trong trang Hồ sơ cá nhân (bắt buộc nhập đúng mật khẩu cũ)
+  async function doiMatKhauCaNhan(matKhauCu, matKhauMoi) {
+    if (!currentUser?.ma_nv) {
+      throw new Error('Không xác định được phiên đăng nhập!');
+    }
+
+    const mkCu = matKhauCu.trim();
+    const mkMoi = matKhauMoi.trim();
+
+    if (mkMoi.length < 6) {
+      throw new Error('Mật khẩu mới phải có ít nhất 6 ký tự!');
+    }
+
+    if (mkCu === mkMoi) {
+      throw new Error('Mật khẩu mới không được trùng với mật khẩu hiện tại!');
+    }
+
+    // 1. Lấy mật khẩu thực tế mới nhất từ Supabase để đối chiếu
+    const { data, error } = await supabase
+      .from('nhan_vien')
+      .select('mat_khau')
+      .eq('ma_nv', currentUser.ma_nv)
+      .single();
+
+    if (error || !data) {
+      throw new Error('Không thể kiểm tra thông tin tài khoản!');
+    }
+
+    const passDungHienTai = data.mat_khau || '123456';
+    if (mkCu !== passDungHienTai) {
+      throw new Error('Mật khẩu hiện tại không chính xác! Nếu quên, vui lòng liên hệ bộ phận IT.');
+    }
+
+    // 2. Tạo session_token mới để giữ phiên máy này và đá văng các máy cũ
+    const newSessionToken = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+
+    const { error: updateError } = await supabase
+      .from('nhan_vien')
+      .update({
+        mat_khau: mkMoi,
+        session_token: newSessionToken,
+      })
+      .eq('ma_nv', currentUser.ma_nv);
+
+    if (updateError) {
+      throw new Error('Lỗi khi cập nhật mật khẩu mới: ' + updateError.message);
+    }
+
+    // 3. Cập nhật lại localStorage và state trên máy hiện tại để KHÔNG bị tự đăng xuất
+    localStorage.setItem('user_session_token', newSessionToken);
+    setCurrentUser((prev) => ({
+      ...prev,
+      mat_khau: mkMoi,
+      session_token: newSessionToken,
+    }));
+  }
+
   // Kiểm tra quyền theo module và hành động chi tiết
   function kiemTraQuyen(moduleName, action = 'view') {
     if (!currentUser) return false;
@@ -197,7 +254,9 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ currentUser, loadingUser, dangNhap, dangXuat, kiemTraQuyen }}>
+    <AuthContext.Provider
+      value={{ currentUser, loadingUser, dangNhap, dangXuat, kiemTraQuyen, doiMatKhauCaNhan }}
+    >
       {children}
     </AuthContext.Provider>
   );
