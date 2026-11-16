@@ -30,7 +30,7 @@ function getThongTinThoiGianVN() {
     const yyyy = d.getUTCFullYear();
     const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(d.getUTCDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    return `${dd}/${mm}/${yyyy}`;
   };
 
   const homNayStr = formatUTCDate(vnTime);
@@ -524,7 +524,7 @@ export default function KhachHangHenPage() {
             ⏰ Khách hẹn H {thoiGian.homNayStr ? `(Trong ngày: ${thoiGian.homNayStr})` : ''}
           </button>
           <button type="button" onClick={() => setActiveTab('TONG')} style={tabButtonStyle(activeTab === 'TONG')}>
-            🚗 Danh sách khách hàng (XVL / Tổng)
+            🚗 Danh sách khách hàng
           </button>
         </div>
 

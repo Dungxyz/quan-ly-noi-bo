@@ -200,7 +200,7 @@ export default function TiepNhanXePage() {
           trang_thai_hen: 'XVL',
         }));
         setNguonKhachBadge({
-          text: '🚗 Khách hàng hệ thống - XVL',
+          text: '🚗 Khách hàng hệ thống',
           bg: '#e0f2fe',
           color: '#0369a1',
         });
