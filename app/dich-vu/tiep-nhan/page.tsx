@@ -168,10 +168,10 @@ export default function TiepNhanXePage() {
           .lte('ngay_hen', homNay);
       }
 
-      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen (từ hôm nay trở đi)
+      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen (từ hôm nay trở đi, ưu tiên ngày gần nhất)
       const { data: khachHen, error: errHen } = await supabase
         .from('dich_vu_khach_hang_hen')
-        .select('bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, trang_thai_hen, ngay_hen')
+        .select('bien_so, ten_khach_hang, so_dien_thoai, hang_muc_du_kien, co_van, ghi_chu, trang_thai_hen, ngay_hen')
         .gte('ngay_hen', homNay)
         .eq('bien_so', bsNhap)
         .order('ngay_hen', { ascending: true })
@@ -190,6 +190,7 @@ export default function TiepNhanXePage() {
           so_dien_thoai: khachHen.so_dien_thoai || prev.so_dien_thoai,
           hang_muc_thuc_hien: khachHen.hang_muc_du_kien || prev.hang_muc_thuc_hien,
           co_van_vien: khachHen.co_van || prev.co_van_vien,
+          ghi_chu: khachHen.ghi_chu || prev.ghi_chu,
           trang_thai_hen: loaiHen,
         }));
         setNguonKhachBadge({
