@@ -200,7 +200,6 @@ export default function TiepNhanXePage() {
           color: '#0369a1',
         });
       } else {
-        // Không có ở cả 2 bảng -> Khách mới (XVL)
         setForm((prev) => ({
           ...prev,
           bien_so: bsNhap,
@@ -253,7 +252,7 @@ export default function TiepNhanXePage() {
 
       if (insertErr) throw insertErr;
 
-      // 2. Đồng bộ thông tin cơ bản sang bảng khách hàng tổng (đã lược bỏ các cột thừa)
+      // 2. Đồng bộ thông tin cơ bản sang bảng khách hàng tổng
       await supabase.from('dich_vu_khach_hang').upsert(
         {
           bien_so: bs,
@@ -356,7 +355,6 @@ export default function TiepNhanXePage() {
 
       if (error) throw error;
 
-      // Cập nhật lại tên & SĐT bên kho khách hàng tổng
       await supabase
         .from('dich_vu_khach_hang')
         .update({

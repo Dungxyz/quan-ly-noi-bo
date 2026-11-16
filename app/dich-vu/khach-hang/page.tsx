@@ -22,7 +22,6 @@ interface KhachHangTongItem {
 }
 
 function getThongTinThoiGianVN() {
-  // Tính giờ Việt Nam (UTC+7) thuần toán học, chạy ổn định trên cả Server Build lẫn Trình duyệt
   const vnTime = new Date(Date.now() + 7 * 60 * 60 * 1000);
   const gio = vnTime.getUTCHours();
   const phut = vnTime.getUTCMinutes();
@@ -70,9 +69,17 @@ export default function KhachHangHenPage() {
 
   // 3 Tab: '24H' (Hẹn ngày mai - Excel) | 'H' (Hẹn trong ngày - Form) | 'TONG' (Danh sách khách hàng tổng)
   const [activeTab, setActiveTab] = useState<'24H' | 'H' | 'TONG'>('24H');
-  const [thoiGian, setThoiGian] = useState(getThongTinThoiGianVN());
+
+  // Khởi tạo giá trị tĩnh mặc định để tránh lỗi prerender Next.js
+  const [thoiGian, setThoiGian] = useState({
+    homNayStr: '',
+    ngayMaiStr: '',
+    daKhoa23h: false,
+    gioHienTai: '',
+  });
 
   useEffect(() => {
+    setThoiGian(getThongTinThoiGianVN());
     const timer = setInterval(() => {
       setThoiGian(getThongTinThoiGianVN());
     }, 30000);
@@ -94,7 +101,7 @@ export default function KhachHangHenPage() {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     id: undefined as number | undefined,
-    ngay_hen: thoiGian.homNayStr,
+    ngay_hen: '',
     bien_so: '',
     ten_khach_hang: '',
     so_dien_thoai: '',
@@ -184,6 +191,7 @@ export default function KhachHangHenPage() {
 
   // 2. Tải file Excel mẫu khớp tên cột bảng dich_vu_khach_hang
   function handleTaiFileMau() {
+    const tg = getThongTinThoiGianVN();
     const mauData = [
       {
         'BIỂN SỐ': '93C14919',
@@ -199,10 +207,10 @@ export default function KhachHangHenPage() {
     const ws = XLSX.utils.json_to_sheet(mauData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'KhachHen24H');
-    XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${thoiGian.ngayMaiStr}.xlsx`);
+    XLSX.writeFile(wb, `Mau_Khach_Hen_24H_${tg.ngayMaiStr}.xlsx`);
   }
 
-  // 3. Import Excel Khách hẹn 24H cho ngày mai (Khóa trước/tại 23h00)
+  // 3. Import Excel Khách hẹn 24H cho ngày mai (Khóa sau 23h00)
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -266,13 +274,11 @@ export default function KhachHangHenPage() {
         return;
       }
 
-      // Lưu vào bảng dich_vu_khach_hang_hen cho ngày mai với trạng thái 24H
       const { error: errHen } = await supabase
         .from('dich_vu_khach_hang_hen')
         .upsert(danhSachImport, { onConflict: 'ngay_hen,bien_so' });
       if (errHen) throw errHen;
 
-      // Đồng bộ ngầm sang bảng dich_vu_khach_hang tổng
       await supabase
         .from('dich_vu_khach_hang')
         .upsert(Array.from(mapKhachTong.values()), { onConflict: 'bien_so' });
@@ -337,10 +343,11 @@ export default function KhachHangHenPage() {
   }
 
   function handleOpenEditKhachTong(item: KhachHangTongItem) {
+    const tg = getThongTinThoiGianVN();
     setIsEditing(true);
     setFormData({
       id: item.id,
-      ngay_hen: thoiGian.homNayStr,
+      ngay_hen: tg.homNayStr,
       bien_so: item.bien_so,
       ten_khach_hang: item.ten_khach_hang,
       so_dien_thoai: item.so_dien_thoai || '',
@@ -375,8 +382,9 @@ export default function KhachHangHenPage() {
         if (error) throw error;
         alert(`Đã cập nhật khách hàng xe ${bsChuan}!`);
       } else {
+        const tg = getThongTinThoiGianVN();
         const payloadHen = {
-          ngay_hen: formData.ngay_hen,
+          ngay_hen: formData.ngay_hen || tg.homNayStr,
           bien_so: bsChuan,
           ten_khach_hang: tenChuan,
           so_dien_thoai: sdtChuan || null,
@@ -388,7 +396,6 @@ export default function KhachHangHenPage() {
           .upsert([payloadHen], { onConflict: 'ngay_hen,bien_so' });
         if (errHen) throw errHen;
 
-        // Đồng bộ sang bảng dich_vu_khach_hang tổng
         await supabase
           .from('dich_vu_khach_hang')
           .upsert(
@@ -480,10 +487,10 @@ export default function KhachHangHenPage() {
           }}
         >
           <button type="button" onClick={() => setActiveTab('24H')} style={tabButtonStyle(activeTab === '24H')}>
-            📅 Khách hẹn 24H (Ngày mai: {thoiGian.ngayMaiStr})
+            📅 Khách hẹn 24H {thoiGian.ngayMaiStr ? `(Ngày mai: ${thoiGian.ngayMaiStr})` : ''}
           </button>
           <button type="button" onClick={() => setActiveTab('H')} style={tabButtonStyle(activeTab === 'H')}>
-            ⏰ Khách hẹn H (Trong ngày: {thoiGian.homNayStr})
+            ⏰ Khách hẹn H {thoiGian.homNayStr ? `(Trong ngày: ${thoiGian.homNayStr})` : ''}
           </button>
           <button type="button" onClick={() => setActiveTab('TONG')} style={tabButtonStyle(activeTab === 'TONG')}>
             🚗 Danh sách khách hàng (XVL / Tổng)
@@ -491,7 +498,7 @@ export default function KhachHangHenPage() {
         </div>
 
         {/* THÔNG BÁO KHÓA SỔ 23H00 CHO TAB 24H */}
-        {activeTab === '24H' && (
+        {activeTab === '24H' && thoiGian.ngayMaiStr && (
           <div
             style={{
               padding: '10px 14px',
@@ -756,7 +763,7 @@ export default function KhachHangHenPage() {
             Không tìm thấy khách hàng nào.
           </div>
         ) : (
-          /* TAB 3: DANH SÁCH KHÁCH HÀNG TỔNG (TỐI GIẢN CỘT) */
+          /* TAB 3: DANH SÁCH KHÁCH HÀNG TỔNG */
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
