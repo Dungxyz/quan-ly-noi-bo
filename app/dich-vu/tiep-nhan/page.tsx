@@ -138,7 +138,7 @@ export default function TiepNhanXePage() {
     loadInitData();
   }, []);
 
-  // 2. Tra cứu 2 tầng: Tìm trong bảng Hẹn hôm nay trước -> Không có mới nhảy sang bảng Khách hàng tổng
+  // 2. Tra cứu 2 tầng: Tìm trong bảng Hẹn (hôm nay & ngày mai) trước -> Không có mới nhảy sang bảng Khách hàng tổng
   async function handleBienSoBlur() {
     const bsNhap = form.bien_so.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     if (!bsNhap) {
@@ -150,12 +150,14 @@ export default function TiepNhanXePage() {
     try {
       const homNay = getHomNayVN();
 
-      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen của ngày hôm nay
+      // TẦNG 1: Tra cứu trong bảng dich_vu_khach_hang_hen (từ hôm nay trở đi, ưu tiên ngày gần nhất)
       const { data: khachHen, error: errHen } = await supabase
         .from('dich_vu_khach_hang_hen')
-        .select('bien_so, ten_khach_hang, so_dien_thoai, trang_thai_hen')
-        .eq('ngay_hen', homNay)
+        .select('bien_so, ten_khach_hang, so_dien_thoai, trang_thai_hen, ngay_hen')
+        .gte('ngay_hen', homNay)
         .eq('bien_so', bsNhap)
+        .order('ngay_hen', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       if (errHen) throw errHen;
@@ -170,7 +172,10 @@ export default function TiepNhanXePage() {
           trang_thai_hen: loaiHen,
         }));
         setNguonKhachBadge({
-          text: loaiHen === '24H' ? '📅 Khách đặt hẹn 24H hôm nay' : '⏰ Khách đặt hẹn H trong ngày',
+          text:
+            loaiHen === '24H'
+              ? `📅 Khách hàng hệ thống - 24H (${khachHen.ngay_hen})`
+              : `⏰ Khách hàng hệ thống - H (${khachHen.ngay_hen})`,
           bg: '#dcfce7',
           color: '#15803d',
         });
@@ -195,7 +200,7 @@ export default function TiepNhanXePage() {
           trang_thai_hen: 'XVL',
         }));
         setNguonKhachBadge({
-          text: '🚗 Khách hàng hệ thống (Không hẹn - XVL)',
+          text: '🚗 Khách hàng hệ thống - XVL',
           bg: '#e0f2fe',
           color: '#0369a1',
         });
@@ -206,7 +211,7 @@ export default function TiepNhanXePage() {
           trang_thai_hen: 'XVL',
         }));
         setNguonKhachBadge({
-          text: '🆕 Xe mới chưa có dữ liệu (XVL)',
+          text: '🆕 Xe mới chưa có dữ liệu - XVL',
           bg: '#fef3c7',
           color: '#b45309',
         });
